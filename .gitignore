@@ -1,4 +1,4 @@
-GRAPHS/.venv/
+Graphs/venv/
 *.aux
 .lia.cache
 *.glob
