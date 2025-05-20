@@ -1,0 +1,8 @@
+GRAPHS/.venv/
+*.aux
+.lia.cache
+*.glob
+Makefile
+*.crashcoqide
+.makefile.d
+*.png
