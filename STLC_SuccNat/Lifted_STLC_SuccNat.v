@@ -6,6 +6,9 @@ Open Scope string_scope.
 (* A Feature is represented by a string *)
 Definition Feature := string.
 
+(*A Feature Configuration is a list of features *)
+Definition FeatureConfig := list Feature.
+
 (* A Presence Condition is a Boolean expression over features *)
 Inductive PresenceCondition : Type :=
   | PC_Feature : Feature -> PresenceCondition
@@ -33,9 +36,6 @@ Notation "'(' x ')'" := x
 Notation "'[[' x ']]'" := x
   (at level 0, x custom pc_syntax at level 99).
 
-(*A Feature Configuration is a list of features *)
-Definition FeatureConfig := list Feature.
-
 (* Function that evaluates a Presence Condition given a Feature Configuration *)
 (* Q: Should I do a relational definition of this function?
       Since it might be easier to prove something *)
@@ -49,20 +49,20 @@ Fixpoint pc_eval (cfg : FeatureConfig) (pc : PresenceCondition) : bool :=
   | PC_False => false
   end.
 
-Definition pc1 := [[ (FEATURE "A") /\ (FEATURE "B") ]].
-Compute pc_eval ["A"; "B"] pc1.
+Example pc1: pc_eval ["A"; "B"] [[ (FEATURE "A") /\ (FEATURE "B") ]] = true.
+Proof. reflexivity. Qed.
 
-Definition pc2 := [[ ~ FEATURE "C" ]].
-Compute pc_eval [] pc2.
+Example pc2: pc_eval [] [[ ~ FEATURE "C" ]] = true.
+Proof. reflexivity. Qed.
 
-Definition pc3 := [[ (FEATURE "A") /\ ~ (FEATURE "B") \/ (FEATURE "C") ]].
-Compute pc_eval ["A"; "B"; "C"] pc2.
+Example pc3: pc_eval ["A"; "B"; "C"] [[ (FEATURE "A") /\ ~ (FEATURE "B") \/ (FEATURE "C") ]] = true.
+Proof. reflexivity. Qed.
 
-Definition pc4 := [[ TRUE /\ (FEATURE "A") ]].
-Compute pc_eval ["A"] pc4.
+Example pc4: pc_eval ["A"] [[ TRUE /\ (FEATURE "A") ]] = true.
+Proof. reflexivity. Qed.
 
-Definition pc5 := [[ FALSE /\ (FEATURE "A") ]].
-Compute pc_eval ["A"] pc5.
+Example pc5: pc_eval ["A"] [[ FALSE /\ (FEATURE "A") ]] = false.
+Proof. reflexivity. Qed.
 
 Definition plustwo := abs "n" Nat (succ (succ (var "n"))).
 
@@ -90,11 +90,126 @@ Qed.
 Definition lifted_plustwo := [(abs "n" Nat (succ (succ (var "n"))), [[TRUE]])].
 Check lifted_plustwo.
 
-Definition lifted_n :=
+Definition lifted_ty := list (ty * PresenceCondition).
+Definition lifted_tm := list (tm * PresenceCondition).
+
+Definition disjoint (pc1 pc2 : PresenceCondition) : Prop :=
+  forall (cfg : FeatureConfig), ~(pc_eval cfg pc1 = true /\ pc_eval cfg pc2 = true).
+
+Example disjoint1: disjoint [[TRUE]] [[FALSE]].
+Proof.
+  intros cfg [Hpc1 Hpc2].
+  rewrite <- Hpc1 in Hpc2.
+  simpl in Hpc2.
+  inversion Hpc2.
+Qed.
+
+Example disjoint2: ~(disjoint [[FEATURE "A"]] [[FEATURE "B"]]).
+Proof.
+  unfold disjoint; intros Hd.
+  specialize Hd with ["A"; "B"].
+  apply Hd. split; simpl; reflexivity.
+Qed.
+
+Example disjoint3:
+  (disjoint
+    [[ ~(FEATURE "A") /\ (FEATURE "B") ]]
+    [[ ~(FEATURE "A") /\ ~(FEATURE "B") ]]
+  ).
+Proof.
+  unfold disjoint.
+  intros cfg [Hpc1 Hpc2].
+  simpl in *.
+  remember (if in_dec string_dec "A" cfg then true else false) as a.
+  remember (if in_dec string_dec "B" cfg then true else false) as b.
+  destruct a, b; 
+    try (inversion Hpc1);
+    inversion Hpc2.
+Qed.
+
+Fixpoint disjointness (lftd_tm : lifted_tm) : Prop :=
+  match lftd_tm with
+  | [] => True
+  | (_, pc) :: rest =>
+      (forall t' pc', In (t', pc') rest -> disjoint pc pc') /\ disjointness rest
+  end.
+
+Definition lifted_x :=
   [
-   (1, [[FEATURE "A"]]);
-   (2, [[~ (FEATURE "A") /\ (FEATURE "B")]]);
-   (3, [[~ (FEATURE "A") /\ ~ (FEATURE "B")]])
+   (const 1, [[FEATURE "A"]]);
+   (const 2, [[~ (FEATURE "A") /\ (FEATURE "B")]]);
+   (const 3, [[~ (FEATURE "A") /\ ~ (FEATURE "B")]])
   ].
 
-(* Lifted Types *)
+Example disjointness_lftd_x: disjointness lifted_x.
+Proof.
+  simpl. split.
+  - intros. destruct H.
+    + inversion H; subst.
+      intros cfg [Hpc1 Hpc2].
+      simpl in *.
+      rewrite Hpc1 in Hpc2.
+      simpl in Hpc2. discriminate.
+    + destruct H.
+      * inversion H.
+        intros cfg [Hpc1 Hpc2].
+        simpl in *.
+        rewrite Hpc1 in Hpc2.
+        simpl in Hpc2. discriminate.
+      * inversion H.
+  - split.
+    + intros. destruct H.
+      * inversion H. apply disjoint3.
+      * inversion H.
+    + split; auto.
+      intros. inversion H.
+Qed.
+
+Definition lifted_y :=
+  [
+    (const 5, [[(FEATURE "A") /\ ~ (FEATURE "B")]]);
+    (const 4, [[FEATURE "B"]]);
+    (const 3, [[~(FEATURE "A") /\ ~(FEATURE "B")]])
+  ].
+
+(*Definetively can make a Ltac to solve this stuff*)
+Example disjointness_lftd_y: disjointness lifted_y.
+Proof.
+  split.
+  - intros. destruct H; inversion H.
+    + intros cfg [Hpc1 Hpc2].
+      simpl in *.
+      remember (if in_dec string_dec "A" cfg then true else false) as a.
+      remember (if in_dec string_dec "B" cfg then true else false) as b.
+      rewrite Hpc2 in Hpc1.
+      destruct a; discriminate.
+    + inversion H0.
+      intros cfg [Hpc1 Hpc2].
+      simpl in *.
+      remember (if in_dec string_dec "A" cfg then true else false) as a.
+      remember (if in_dec string_dec "B" cfg then true else false) as b.
+      destruct a, b; discriminate.
+    + inversion H0.
+  - split.
+    + intros. destruct H.
+      * inversion H.
+        intros cfg [Hpc1 Hpc2].
+        simpl in *.
+        remember (if in_dec string_dec "A" cfg then true else false) as a.
+        remember (if in_dec string_dec "B" cfg then true else false) as b.
+        rewrite Hpc1 in Hpc2.
+        destruct a; discriminate.
+      * inversion H.
+    + split.
+      * intros. inversion H.
+      * apply I.
+Qed.
+
+Definition lifted_z := [ (const 19, [[TRUE]]) ].
+
+Example disjointness_lftd_z: disjointness lifted_z.
+Proof.
+  split.
+  - intros. inversion H.
+  - apply I.
+Qed.
