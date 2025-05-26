@@ -6,6 +6,7 @@ Graphs/venv/
 *.vok
 *.vos
 *.vo
+*.glob
 
 # Ignore CoqIDE crash files
 *.crashcoqide
