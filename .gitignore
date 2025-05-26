@@ -1,8 +1,30 @@
+# Ignore virtual environments
 Graphs/venv/
+
+# Ignore Coq build artifacts (common extensions)
 *.aux
-.lia.cache
-*.glob
-Makefile
+*.vok
+*.vos
+*.vo
+
+# Ignore CoqIDE crash files
 *.crashcoqide
+
+# Ignore make-related files (case-insensitive match)
+[Mm]akefile*
 .makefile.d
+*.d
+
+# Ignore compiled images or graphs
 *.png
+
+# Ignore Coq project configuration
+_CoqProject
+*.cache
+
+# Ignore local Makefile config
+Makefile.conf
+
+# Ignore .Makefile.d files in subdirectories
+**/.Makefile.d
+
