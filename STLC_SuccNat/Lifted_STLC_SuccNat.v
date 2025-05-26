@@ -65,13 +65,35 @@ Example pc5: pc_eval ["A"] [[ FALSE /\ (FEATURE "A") ]] = false.
 Proof. reflexivity. Qed.
 
 (*TODO: Define a plusone because it's simpler to work with*)
+Definition plusone := abs "n" Nat (succ (var "n")).
+
 Definition plustwo := abs "n" Nat (succ (succ (var "n"))).
+
+Example ty_plusone: has_type empty plusone (Arrow Nat Nat).
+Proof.
+  apply T_Abs.
+  apply T_Succ.
+  apply T_Var.
+  reflexivity.
+Qed.
 
 Example ty_plustwo: has_type empty plustwo (Arrow Nat Nat).
 Proof.
   apply T_Abs.
   apply T_Succ. apply T_Succ.
   apply T_Var. reflexivity.
+Qed.
+
+Example plusone_0_is_1:
+  step_normal_form_of (STLC_SuccNat.app plusone (const 0)) (const 1).
+Proof.
+  split.
+  - eapply multi_step.
+    + apply ST_AppAbs. apply v_nat.
+    + eapply multi_step.
+      * simpl. eapply ST_SuccConst.
+      * apply multi_refl.
+  - intros [t' Contra]. inversion Contra.
 Qed.
 
 Example plustwo_3_is_5:
