@@ -215,7 +215,3 @@ Proof.
   - intros. inversion H.
   - apply I.
 Qed.
-
-(nat -> nat)^
-
-apply : (nat -> nat)^ -> (nat^) -> (nat^)
