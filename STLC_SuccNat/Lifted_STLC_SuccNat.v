@@ -64,6 +64,7 @@ Proof. reflexivity. Qed.
 Example pc5: pc_eval ["A"] [[ FALSE /\ (FEATURE "A") ]] = false.
 Proof. reflexivity. Qed.
 
+(*TODO: Define a plusone because it's simpler to work with*)
 Definition plustwo := abs "n" Nat (succ (succ (var "n"))).
 
 Example ty_plustwo: has_type empty plustwo (Arrow Nat Nat).
@@ -90,6 +91,7 @@ Qed.
 Definition lifted_plustwo := [(abs "n" Nat (succ (succ (var "n"))), [[TRUE]])].
 Check lifted_plustwo.
 
+(* It's possible to define this like a function that receives a ty and returns a lifted_ty *)
 Definition lifted_ty := list (ty * PresenceCondition).
 Definition lifted_tm := list (tm * PresenceCondition).
 
@@ -213,3 +215,7 @@ Proof.
   - intros. inversion H.
   - apply I.
 Qed.
+
+(nat -> nat)^
+
+apply : (nat -> nat)^ -> (nat^) -> (nat^)
