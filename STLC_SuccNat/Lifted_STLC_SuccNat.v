@@ -110,11 +110,13 @@ Proof.
   - intros [t' Contra]. inversion Contra.
 Qed.
 
+Definition lifted_plusone := [(abs "n" Nat (succ (var "n")), [[TRUE]])].
+
 Definition lifted_plustwo := [(abs "n" Nat (succ (succ (var "n"))), [[TRUE]])].
 Check lifted_plustwo.
 
 (* It's possible to define this like a function that receives a ty and returns a lifted_ty *)
-Definition lifted_ty := list (ty * PresenceCondition).
+(* Definition lifted_ty := list (ty * PresenceCondition). *)
 Definition lifted_tm := list (tm * PresenceCondition).
 
 Definition disjoint (pc1 pc2 : PresenceCondition) : Prop :=
@@ -237,3 +239,31 @@ Proof.
   - intros. inversion H.
   - apply I.
 Qed.
+
+(* Automatic lifting *)
+Fixpoint lift (t:tm) : lifted_tm :=
+  match t with
+  | var s => [(var s, [[TRUE]])]
+  | STLC_SuccNat.app t1 t2 =>
+    flat_map (fun '(tm1, pc1) =>
+      map (fun '(tm2, pc2) => 
+        ((STLC_SuccNat.app tm1 tm2), (PC_And pc1 pc2))) (lift t2)) (lift t1)
+  | const n => [(const n, [[TRUE]])]
+  | succ t1 =>
+    map (fun '(tm, pc) => (succ tm, pc)) (lift t1)
+  | abs s T t1 =>
+    map (fun '(tm, pc) => (abs s T tm, pc)) (lift t1)
+  end.
+
+Example lifting_plusone: lift plusone = lifted_plusone.
+Proof.
+  unfold lifted_plusone.
+  simpl. reflexivity.
+Qed.
+
+Example lifting_plustwo: lift plustwo = lifted_plustwo.
+Proof.
+  unfold lifted_plustwo.
+  simpl. reflexivity.
+Qed.
+
