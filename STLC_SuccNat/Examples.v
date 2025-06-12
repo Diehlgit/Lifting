@@ -151,7 +151,6 @@ Proof.
   inversion H; subst;
     try (solve_by_inverts 1);
     clear H0 H.
-  simpl in H1.
   inversion H1; subst;
     try (solve_by_inverts 1).
 
@@ -248,4 +247,43 @@ Proof.
 
   simpl. reflexivity.
 Qed.
+
+Example lift_plusone_correct: forall spl cfg p r r',
+  derive spl cfg = Some p ->
+  step'_normal_form_of (app' (lift plusone) (const' spl)) (const' r') ->
+  step_normal_form_of (STLC_SuccNat.app plusone (const p)) (const r) ->
+  derive r' cfg = Some r.
+Proof.
+  intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
+
+  inversion Hmstep; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H6.
+  simpl in H.
+  inversion H0; subst.
+  inversion H1; subst;
+    try solve_by_inverts 1.
+    clear H1 H0.
+  inversion H2; subst;
+    try solve_by_inverts 1;
+    clear H H2.
+
+  inversion Hmstep'; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H6.
+  inversion H0; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H0.
+
+  inversion H1; subst.
+    2:{ inversion H. }
+  apply mapping_not_change_deriving.
+  assumption.
+Qed.
+
+
+
 

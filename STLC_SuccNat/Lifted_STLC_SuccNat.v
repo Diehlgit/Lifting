@@ -130,12 +130,36 @@ Inductive step': tm' -> tm' -> Prop :=
 Definition step'_normal_form_of t' t'':=
   (multi step' t' t'' /\ normal_form step' t'').
 
-(**)
-Theorem lifting_correct: forall (t:tm) (T:ty) (s:string) (cfg: FeatureConfig) (n1' n2':nat') (n1 n2:nat),
-  (derive n1' cfg) = Some n1 ->
-  (* has_type empty (STLC_SuccNat.app (abs s T t) (const n1)) Nat -> *)
-  step_normal_form_of (STLC_SuccNat.app (abs s T t) (const n1)) (const n2) ->
-  step'_normal_form_of (app' (lift (abs s T t)) (const' n1')) (const' n2') ->
-  (derive n2' cfg) = Some n2.
+(*I don't think that a proof by induction on f is the way to go,
+  because the Induction Hypothesis doesn't seem to help in any way.*)
+(*
+On the correctness of lifting:
+  Given a function f and a Software product Line L.
+  We say that the lifting of f (f') is correct if
+  for all derivations of L (L|p), f(L|p) = r => f'(L) |p = r.
+*)
+
+Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
+  derive spl cfg = Some p ->
+  derive (map (fun '(n, pc) => (analisys n, pc)) spl) cfg = Some (analisys p).
 Proof.
-Admitted.
+  induction spl;
+  intros cfg p analisys Hd.
+  - inversion Hd.
+  - destruct a. simpl in Hd.
+    destruct (pc_eval cfg p0) eqn: EQ.
+    + simpl. rewrite EQ in *.
+      f_equal. injection Hd as Hd.
+      f_equal. assumption.
+    + simpl. rewrite EQ in *.
+      apply IHspl. assumption.
+Qed.
+
+Theorem lifting_correctness: forall (analisys:tm) (cfg:FeatureConfig) (spl r':nat') (p r:nat),
+  (derive spl cfg) = Some p ->
+  step_normal_form_of (STLC_SuccNat.app analisys (const p)) (const r) ->
+  step'_normal_form_of (app' (lift analisys) (const' spl)) (const' r') ->
+  (derive r' cfg) = Some r.
+Proof.
+  intros analisys cfg spl r' p r Hd [Hmstep Hnf] [Hmstep' Hnf'].
+  Abort.
