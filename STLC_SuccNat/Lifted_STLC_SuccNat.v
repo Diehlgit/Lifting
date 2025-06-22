@@ -103,7 +103,7 @@ Inductive value' : tm' -> Prop :=
 Fixpoint subst' (x:string) (s' t': tm'): tm' :=
   match t' with
   | var' y => if String.eqb x y then s' else t'
-  | abs' y T' t1' => if String.eqb x y then t1' else abs' y T' (subst' x s' t1')
+  | abs' y T' t1' => if String.eqb x y then t' else abs' y T' (subst' x s' t1')
   | app' t1' t2' => app' (subst' x s' t1') (subst' x s' t2')
   | const' _ => t'
   | succ' t1' => succ' (subst' x s' t1')
@@ -134,9 +134,9 @@ Definition step'_normal_form_of t' t'':=
   because the Induction Hypothesis doesn't seem to help in any way.*)
 (*
 On the correctness of lifting:
-  Given a function f and a Software product Line L.
-  We say that the lifting of f (f') is correct if
-  for all derivations of L (L|p), f(L|p) = r => f'(L) |p = r.
+  Given an analisys and a Software product Line spl.
+  We say that the lifting of this analisys (analisys') is correct if
+  for all derivations of spl (spl|cfg), analisys (spl|cfg) = r => (analisys' spl)|cfg = r.
 *)
 
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
