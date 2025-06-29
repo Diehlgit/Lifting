@@ -1,6 +1,6 @@
-Require Import STLC_SuccNat.
 Require Import String List Maps.
 Import ListNotations.
+Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
 
 (* Presence Condition Evaluation Examples *)
@@ -273,17 +273,68 @@ Proof.
   inversion H; subst;
     try solve_by_inverts 1;
     clear H H6.
+    simpl in H0.
   inversion H0; subst.
   inversion H; subst;
     try solve_by_inverts 1;
     clear H H0.
+  inversion H1; subst;
+    try solve_by_inverts 1;
+    clear H1.
 
-  inversion H1; subst.
-    2:{ inversion H. }
   apply mapping_not_change_deriving.
   assumption.
 Qed.
 
+Example lift_plustwo_correct: forall spl cfg p r r',
+  derive spl cfg = Some p ->
+  step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
+  step_normal_form_of (app plustwo (const p)) (const r) ->
+  derive r' cfg = Some r.
+Proof.
+  intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
 
+  inversion Hmstep; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H6.
+  simpl in H.
+  inversion H0; subst.
+  inversion H1; subst;
+    try solve_by_inverts 1.
+    clear H1 H0.
+  inversion H4; subst;
+    try solve_by_inverts 1;
+    clear H H4.
+  inversion H2; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H2.
+  inversion H0; subst;
+    try solve_by_inverts 1;
+    clear H0.
 
+  inversion Hmstep'; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H6.
+    simpl in H0.
+  inversion H0; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H0.
+  inversion H3; subst;
+    try solve_by_inverts 1;
+    clear H3.
+  inversion H1; subst.
+  inversion H; subst;
+    try solve_by_inverts 1;
+    clear H H1.
+  inversion H0; subst;
+    try solve_by_inverts 1;
+    clear H0.
 
+  apply mapping_not_change_deriving.
+  apply mapping_not_change_deriving.
+  assumption.
+Qed.
