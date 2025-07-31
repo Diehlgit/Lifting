@@ -243,3 +243,32 @@ Proof.
   - destruct y; destruct P22; eauto.
   - remember (determinism _ _ _ H H0) as e. congruence.
 Qed.
+
+(* Auxiliary Lemmas about the language's functioning *)
+
+Lemma succ_arg_normalizes: forall t1 t2,
+  step_normal_form_of t1 t2 ->
+  multi step (succ t1) (succ t2).
+Proof.
+  intros t1 t2 [Hms Hnf].
+  induction Hms; subst.
+  - apply multi_refl.
+  - apply IHHms in Hnf.
+    eapply multi_step.
+    + apply ST_Succ. exact H.
+    + exact Hnf.
+Qed.
+
+Lemma multi_step_trans: forall t1 t2 t3,
+  multi step t1 t2 ->
+  multi step t2 t3 ->
+  multi step t1 t3.
+Proof.
+  intros t1 t2 t3 H12 H23.
+  induction H12.
+  - exact H23.
+  - apply IHmulti in H23.
+    eapply multi_step.
+    + exact H.
+    + exact H23.
+Qed.

@@ -298,7 +298,7 @@ Proof.
   inversion H; subst;
     try solve_by_inverts 1;
     clear H6.
-  simpl in H.
+  simpl in H, H0.
   inversion H0; subst.
   inversion H1; subst;
     try solve_by_inverts 1.
@@ -338,3 +338,161 @@ Proof.
   apply mapping_not_change_deriving.
   assumption.
 Qed.
+
+Ltac normalize :=
+	(eapply multi_step;
+		[ econstructor; econstructor 
+		| try (eapply multi_refl; econstructor); normalize]).
+
+Example lift_plustwo_correct': forall spl cfg p r r',
+  derive spl cfg = Some p ->
+  step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
+  step_normal_form_of (app plustwo (const p)) (const r) ->
+  derive r' cfg = Some r.
+Proof.
+  intros spl cfg p r r' Hd [Hnf'] Hnf.
+
+  assert (Hr: step_normal_form_of (app plustwo (const p)) (const (S(S p)))).
+  { split.
+    - eapply multi_step.
+      + econstructor; econstructor.
+      + eapply multi_step.
+        * econstructor. simpl. eapply ST_SuccConst.
+        * normalize.
+    - intros [t' contra]. inversion contra.
+  }
+
+  apply (normal_forms_unique _ _ _ Hnf) in Hr.
+  injection Hr as Hr.
+
+  assert (Hr': step'_normal_form_of (app' (lift plustwo) (const' spl))
+                    (const' (map (fun '(n, pc) => (S n, pc)) (map (fun '(n, pc) => (S n, pc)) spl)))).
+  { split.
+    - eapply multi_step.
+      + econstructor; econstructor.
+      + eapply multi_step.
+        * econstructor. eapply ST_SuccConst'.
+        * normalize.
+    - intros [t' contra]. inversion contra.
+  }
+
+(*TODO: Prove determinism and normal_forms_unique for the step' relation*)
+  clear Hr';
+  assert(Hr': (const' r') = (const' (map (fun '(n, pc) => (S n, pc)) (map (fun '(n, pc) => (S n, pc)) spl)))).
+  { admit. }
+  injection Hr' as Hr'.
+
+
+  subst.
+  apply mapping_not_change_deriving.
+  apply mapping_not_change_deriving.
+  assumption.
+
+Abort.
+
+(* Trying to work with a general plus_n function *)
+
+Fixpoint gen_plusn (n:nat) (t:tm) : tm :=
+  match n with
+  | O => t
+  | S m => succ (gen_plusn m t)
+  end.
+
+Definition plusn (n:nat) : tm := abs "n" Nat (gen_plusn n (var "n")).
+
+Compute subst "n" (const 0) (gen_plusn 1 (var "n")).
+Compute plusn 0.
+
+Lemma subst_gen_plusn: forall n s t,
+  subst s t (gen_plusn n (var s)) = gen_plusn n t.
+Proof.
+  induction n; intros.
+  - simpl. rewrite eqb_refl. reflexivity.
+  - simpl. rewrite IHn. reflexivity.
+Qed.
+
+Lemma normal_form_plusn: forall n k s,
+    step_normal_form_of (subst s (const k) (gen_plusn n (var s))) (const (n + k)).
+Proof.
+  intros. induction n.
+  - simpl. rewrite eqb_refl. split.
+    + apply multi_refl.
+    + intros [t contra]. inversion contra.
+  - split; [idtac | intros [t contra]; inversion contra].
+    simpl. rewrite subst_gen_plusn in *.
+
+    apply succ_arg_normalizes in IHn.
+    assert (Hnf: step_normal_form_of (succ (const (n + k))) (const (S (n + k)))).
+    { split.
+      - normalize.
+      - intros [t contra]. inversion contra.
+    }
+    inversion Hnf as [Hms _].
+    apply (multi_step_trans _ _ _ IHn Hms).
+Qed.
+
+Lemma lift_plusn_correct: forall n spl cfg p r r',
+  derive spl cfg = Some p ->
+  step'_normal_form_of (app' (lift (plusn n)) (const' spl)) (const' r') ->
+  step_normal_form_of (app (plusn n) (const p)) (const r) ->
+  derive r' cfg = Some r.
+Proof.
+  induction n;
+  intros spl cfg p r r' Hd Hmstep' Hmstep.
+  - assert (Hr': step'_normal_form_of (app' (lift (plusn 0)) (const' spl)) (const' spl)).
+    { split.
+      - normalize.
+      - intros [t' contra]. inversion contra.
+    } 
+    assert (Hr: step_normal_form_of (app (plusn 0) (const p)) (const p)).
+    { split.
+      - normalize.
+      - intros [t' contra]. inversion contra.
+    }
+
+    apply (normal_forms_unique _ _ _ Hmstep) in Hr.
+    injection Hr as Hr. subst.
+
+    (* apply (normal_forms'_unique _ _ _ Hmstep') in Hr'.*)
+    clear Hr';
+    assert(Hr': (const' r') = (const' spl)).
+    { admit. }
+    injection Hr' as Hr'. subst.
+
+    assumption.
+
+  - specialize IHn with (spl:= spl) (cfg:=cfg) (p:=p).
+
+    destruct Hmstep as [Hmstep Hnf].
+    unfold plusn in Hmstep. simpl in Hmstep.
+    inversion Hmstep; subst.
+    inversion H; subst;
+      try solve_by_inverts 1;
+    clear H6 H. simpl in H0.
+
+    (*Showing that r = S(n + p)*)
+    (* clear IHn Hd Hmstep' Hmstep. *)
+    remember (normal_form_plusn n p "n") as H; clear HeqH.
+    apply succ_arg_normalizes in H.
+    assert (H23: multi step (succ (const (n + p))) (const (S (n + p)))).
+    { normalize. }
+    apply (multi_step_trans _ _ _ H)  in H23. clear H.
+    assert (Hreq: const r = const (S (n + p))).
+    { eapply normal_forms_unique; split.
+      - exact H0.
+      - exact Hnf.
+      - exact H23.
+      - intros [t contra]; inversion contra.
+    }
+    injection Hreq as Hreq; subst.
+    clear H23 H0 Hnf.
+
+    (*Showing that r' = map (fun '(n, pc) => (S n, pc)) (map (fun '(n, pc) => (n + p, pc)) spl)*)
+    destruct Hmstep' as [Hmstep' Hnf'].
+
+    inversion Hmstep'; subst.
+    inversion H; subst;
+      try solve_by_inverts 1.
+    clear H6 H. simpl in H0.
+
+    Abort.
