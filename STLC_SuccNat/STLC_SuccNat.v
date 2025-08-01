@@ -177,7 +177,6 @@ Ltac solve_by_inverts n :=
 			subst; solve_by_inverts (S n') end ]
 	end end.
 
-(*TODO: make this proof more robust *)
 Theorem determinism : forall t1 t2 t3,
   step t1 t2 -> step t1 t3 -> t2 = t3.
 Proof.

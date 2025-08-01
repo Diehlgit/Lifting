@@ -130,15 +130,6 @@ Inductive step': tm' -> tm' -> Prop :=
 Definition step'_normal_form_of t' t'':=
   (multi step' t' t'' /\ normal_form step' t'').
 
-(*I don't think that a proof by induction on f is the way to go,
-  because the Induction Hypothesis doesn't seem to help in any way.*)
-(*
-On the correctness of lifting:
-  Given an analisys and a Software product Line spl.
-  We say that the lifting of this analisys (analisys') is correct if
-  for all derivations of spl (spl|cfg), analisys (spl|cfg) = r => (analisys' spl)|cfg = r.
-*)
-
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
   derive spl cfg = Some p ->
   derive (map (fun '(n, pc) => (analisys n, pc)) spl) cfg = Some (analisys p).
@@ -154,6 +145,99 @@ Proof.
     + simpl. rewrite EQ in *.
       apply IHspl. assumption.
 Qed.
+
+Lemma map_map_pairs: forall {A B: Type} (l: list (A*B)) (f g: A -> A),
+  map (fun '(v2, pc2) => (g v2, pc2)) (map (fun '(v1, pc1) => (f v1, pc1)) l) =
+  map (fun '(v3, pc3) => (g (f v3), pc3)) l.
+Proof.
+  induction l; intros.
+  - simpl. reflexivity.
+  - simpl. rewrite IHl.
+    f_equal. destruct a.
+    reflexivity.
+Qed.
+
+Lemma succ'_arg_normalizes: forall t1' t2',
+  step'_normal_form_of t1' t2' ->
+  multi step' (succ' t1') (succ' t2').
+Proof.
+  intros t1' t2' [Hms' Hnf'].
+  induction Hms'; subst.
+  - apply multi_refl.
+  - apply IHHms' in Hnf'.
+    eapply multi_step.
+    + apply ST_Succ'. exact H.
+    + exact Hnf'.
+Qed.
+
+Lemma multi_step'_trans: forall t1' t2' t3',
+  multi step' t1' t2' ->
+  multi step' t2' t3' ->
+  multi step' t1' t3'.
+Proof.
+  intros t1' t2' t3' H12 H23.
+  induction H12.
+  - exact H23.
+  - apply IHmulti in H23.
+    eapply multi_step.
+    + exact H.
+    + exact H23.
+Qed.
+
+(* Language Theorems *)
+
+Lemma value'_is_nf: forall t',
+  value' t' -> step'_normal_form_of t' t'.
+Proof.
+  induction t'; intros Hv;
+  split;
+    try inversion Hv; subst;
+    try (intros [t1' Hc]; inversion Hc);
+    try constructor.
+Qed.
+
+Ltac value'_no_step :=
+	match goal with
+	| [ H1: value' ?t, H2: step' ?t  _ |- _ ] =>
+		exfalso; apply value'_is_nf in H1 as [_ H1]; eauto
+	end.
+
+Theorem determinism' : forall t1' t2' t3',
+  step' t1' t2' -> step' t1' t3' -> t2' = t3'.
+Proof.
+  intros t1' t2' t3' Ht.
+  generalize dependent t3'.
+  induction Ht; intros t3' Ht';
+    inversion Ht'; subst; eauto;
+    try value'_no_step;
+    try (f_equal; eauto);
+    try solve_by_inverts 1.
+Qed.
+
+Theorem normal_forms'_unique: forall t1' t2' t3',
+  step'_normal_form_of t1' t2' ->
+  step'_normal_form_of t1' t3' ->
+  t2' = t3'.
+Proof.
+  intros t1' t2' t3' P1 P2.
+  destruct P1 as [P12 Pnf2].
+  destruct P2 as [P13 Pnf3].
+  induction P12; subst;
+    inversion P13; subst;
+    try (apply (IHP12 Pnf2)).
+  - reflexivity.
+  - destruct Pnf2. eauto.
+  - destruct y; destruct Pnf3; eauto.
+  - remember (determinism' _ _ _ H H0) as e. congruence.
+Qed.
+
+
+(*
+On the correctness of lifting:
+  Given an analisys and a Software product Line spl.
+  We say that the lifting of this analisys (analisys') is correct if
+  for all derivations of spl (spl|cfg), analisys (spl|cfg) = r => (analisys' spl)|cfg = r.
+*)
 
 Theorem lifting_correctness: forall (analisys:tm) (cfg:FeatureConfig) (spl r':nat') (p r:nat),
   (derive spl cfg) = Some p ->
