@@ -286,71 +286,18 @@ Proof.
   assumption.
 Qed.
 
+Ltac normalize :=
+	(eapply multi_step;
+		[ econstructor; econstructor 
+		| try (eapply multi_refl; econstructor); normalize]).
+
 Example lift_plustwo_correct: forall spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
   step_normal_form_of (app plustwo (const p)) (const r) ->
   derive r' cfg = Some r.
 Proof.
-  intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
-
-  inversion Hmstep; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H6.
-  simpl in H, H0.
-  inversion H0; subst.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-    clear H1 H0.
-  inversion H4; subst;
-    try solve_by_inverts 1;
-    clear H H4.
-  inversion H2; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H2.
-  inversion H0; subst;
-    try solve_by_inverts 1;
-    clear H0.
-
-  inversion Hmstep'; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H6.
-    simpl in H0.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H0.
-  inversion H3; subst;
-    try solve_by_inverts 1;
-    clear H3.
-  inversion H1; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H1.
-  inversion H0; subst;
-    try solve_by_inverts 1;
-    clear H0.
-
-  apply mapping_not_change_deriving.
-  apply mapping_not_change_deriving.
-  assumption.
-Qed.
-
-Ltac normalize :=
-	(eapply multi_step;
-		[ econstructor; econstructor 
-		| try (eapply multi_refl; econstructor); normalize]).
-
-Example lift_plustwo_correct': forall spl cfg p r r',
-  derive spl cfg = Some p ->
-  step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
-  step_normal_form_of (app plustwo (const p)) (const r) ->
-  derive r' cfg = Some r.
-Proof.
-  intros spl cfg p r r' Hd [Hnf'] Hnf.
+  intros spl cfg p r r' Hd Hnf' Hnf.
 
   assert (Hr: step_normal_form_of (app plustwo (const p)) (const (S(S p)))).
   { split.
@@ -376,19 +323,14 @@ Proof.
     - intros [t' contra]. inversion contra.
   }
 
-(*TODO: Prove determinism and normal_forms_unique for the step' relation*)
-  clear Hr';
-  assert(Hr': (const' r') = (const' (map (fun '(n, pc) => (S n, pc)) (map (fun '(n, pc) => (S n, pc)) spl)))).
-  { admit. }
+  apply (normal_forms'_unique _ _ _ Hnf') in Hr'.
   injection Hr' as Hr'.
-
 
   subst.
   apply mapping_not_change_deriving.
   apply mapping_not_change_deriving.
   assumption.
-
-Abort.
+Qed.
 
 (* Trying to work with a general plus_n function *)
 
@@ -425,6 +367,10 @@ Proof.
   - rewrite eqb_refl. reflexivity.
   - rewrite IHn. reflexivity.
 Qed.
+
+(* Auxiliary proofs stating that the application of plusn and plusn'
+   have closed forms.
+*)
 
 Lemma normal_form_plusn: forall n k,
     step_normal_form_of (app (plusn n) (const k)) (const (n + k)).
@@ -490,7 +436,11 @@ Proof.
       apply (multi_step'_trans _ _ _ H H0).
 Qed.
 
-Lemma lift_plusn_correct: forall n spl cfg p r r',
+(* Proving that the commutation diagram holds for
+   any (+ n) function.
+ *)
+
+Theorem lift_plusn_correct: forall n spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift (plusn n)) (const' spl)) (const' r') ->
   step_normal_form_of (app (plusn n) (const p)) (const r) ->
@@ -507,10 +457,11 @@ Proof.
 
   (* Showing that r' = const' (map (fun '(n0, pc) => (n + n0, pc)) spl) *)
   assert (Hr': const' r' = const' (map (fun '(n0, pc) => (n + n0, pc)) spl)).
-  { (* apply normal_forms'_unique with (t1:= (app' (lift (plusn n)) (const' spl))). *)
-    admit. }
+  { apply normal_forms'_unique with (t1':= (app' (lift (plusn n)) (const' spl))).
+    - exact Hsnf'.
+    - apply normal_form'_lift_plusn. }
   injection Hr' as Hr'; subst.
+
   apply mapping_not_change_deriving.
   exact Hd.
-Abort.
-
+Qed.
