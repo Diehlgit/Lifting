@@ -1,0 +1,8 @@
+TODO list:
+
+1) Definir tipagem para a linguagem liftada
+
+2) Provar type safety (progress e preservation) para a linguagem liftada.
+
+3) Enunciar e provar o teorema de comutatividade para uma função mais geral analysis : nat -> nat.
+

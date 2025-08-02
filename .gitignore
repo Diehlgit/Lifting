@@ -27,6 +27,3 @@ Makefile.conf
 
 # Ignore .Makefile.d files in subdirectories
 **/.Makefile.d
-
-# Ignore .txt files (notes)
-*.txt
