@@ -130,6 +130,126 @@ Inductive step': tm' -> tm' -> Prop :=
 Definition step'_normal_form_of t' t'':=
   (multi step' t' t'' /\ normal_form step' t'').
 
+(* Typing *)
+Definition context' := partial_map ty'.
+
+Inductive has_type': context' -> tm' -> ty' -> Prop :=
+  | T_Var' : forall Gamma' x T',
+    Gamma' x = Some T' ->
+      has_type' Gamma' (var' x) T'
+  | T_Abs' : forall Gamma' x T1' T2' t',
+    has_type' (x |-> T2' ; Gamma') t' T1' ->
+      has_type' Gamma' (abs' x T2' t') (Arrow' T2' T1')
+  | T_App' : forall Gamma' T1' T2' t1' t2',
+    has_type' Gamma' t1' (Arrow' T2' T1') ->
+    has_type' Gamma' t2' T2' ->
+      has_type' Gamma' (app' t1' t2') T1'
+
+  | T_Nat' : forall Gamma' (n' : nat'),
+    has_type' Gamma' (const' n') Nat'
+  | T_Succ' : forall Gamma' t',
+    has_type' Gamma' t' Nat' ->
+      has_type' Gamma' (succ' t') Nat'.
+
+(* Typing Theorems *)
+Lemma weakening': forall Gamma1' Gamma2' t' T',
+  includedin Gamma1' Gamma2' ->
+  has_type' Gamma1' t' T' ->
+  has_type' Gamma2' t' T'.
+Proof.
+  intros Gamma1' Gamma2' t' T' H Ht.
+  generalize dependent Gamma2'.
+  induction Ht; intros Gamma2' Hi;
+    econstructor; eauto using includedin_update.
+Qed.
+
+Lemma weakening_empty' : forall Gamma' t' T',
+  has_type' empty t' T' ->
+  has_type' Gamma' t' T'.
+Proof.
+  intros Gamma' t' T'.
+  eapply weakening'.
+  discriminate.
+Qed.
+
+Lemma canonical_forms_nat' : forall t',
+  has_type' empty t' Nat' ->
+  value' t' ->
+  exists n', t' = const' n'.
+Proof.
+  intros t' Ht Hv; induction t';
+    inversion Hv; subst;
+    inversion Ht;
+    eauto.
+Qed.
+
+Lemma canonical_forms_fun' : forall t' T1' T2',
+  has_type' empty t' (Arrow' T1' T2') ->
+  value' t' ->
+  exists x u', t' = abs' x T1' u'.
+Proof.
+  intros t' T1' T2' HT HVal.
+  destruct HVal as [x ? t1'| ] ; inversion HT; subst.
+  exists x, t1'. reflexivity.
+Qed.
+
+Theorem progress' : forall t1' T',
+  has_type' empty t1' T' ->
+    value' t1' \/ exists t2', step' t1' t2'.
+Proof.
+  intros t' T' Ht.
+  remember empty as Gamma'.
+  induction Ht; subst Gamma';
+    try (left; constructor).
+  - inversion H.
+  - right. destruct IHHt1;
+    destruct IHHt2; unfold_exists; eauto using ST_App1', ST_App2'.
+    eapply canonical_forms_fun' in Ht1 as [x [u' Ht1'] ]; subst;
+      eauto; eexists; econstructor; assumption.
+  - right. destruct IHHt; eauto.
+    + eapply canonical_forms_nat' in H as [n' H]; subst; eauto.
+      eexists. apply ST_SuccConst'.
+    + destruct H; eexists; eapply ST_Succ'; eauto.
+Qed.
+
+Lemma substitution_preserves_typing': forall Gamma' x U' t' v' T',
+  has_type' (x |-> U' ; Gamma') t' T' ->
+  has_type' empty v' U' ->
+  has_type' Gamma' (subst' x v' t') T'.
+Proof.
+  intros Gamma' x U' t' v' T' Ht' Hv'.
+  generalize dependent Gamma'. generalize dependent T'.
+  induction t'; intros T' Gamma' H;
+    inversion H; clear H; subst; simpl; eauto;
+    try (econstructor; eauto);
+    destruct (eqb_spec x s); subst; try (constructor).
+    + rewrite update_eq in H2.
+      injection H2 as H2; subst.
+      apply weakening_empty'. assumption.
+    + rewrite update_neq in H2; auto.
+    + rewrite update_shadow in H5. assumption.
+    + apply IHt'. eapply update_permute in n.
+      rewrite n in H5. assumption.
+Qed.
+
+Theorem preservation': forall t1' t2' T',
+  has_type' empty t1' T' ->
+  step' t1' t2' ->
+  has_type' empty t2' T'.
+Proof.
+  intros t1' t2' T' Ht;
+  generalize dependent t2'.
+  remember empty as Gamma'.
+  induction Ht; intros ts' H0;
+    inversion H0; subst;
+      try (econstructor; eauto).
+  apply (T_App' _ _ _ _ _ Ht1) in Ht2.
+  eapply substitution_preserves_typing';
+    inversion Ht2; inversion H4; subst;
+    eassumption.
+Qed.
+
+(* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
   derive spl cfg = Some p ->
   derive (map (fun '(n, pc) => (analisys n, pc)) spl) cfg = Some (analisys p).
@@ -157,19 +277,7 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma succ'_arg_normalizes: forall t1' t2',
-  step'_normal_form_of t1' t2' ->
-  multi step' (succ' t1') (succ' t2').
-Proof.
-  intros t1' t2' [Hms' Hnf'].
-  induction Hms'; subst.
-  - apply multi_refl.
-  - apply IHHms' in Hnf'.
-    eapply multi_step.
-    + apply ST_Succ'. exact H.
-    + exact Hnf'.
-Qed.
-
+(* Language Theorems *)
 Lemma multi_step'_trans: forall t1' t2' t3',
   multi step' t1' t2' ->
   multi step' t2' t3' ->
@@ -183,8 +291,6 @@ Proof.
     + exact H.
     + exact H23.
 Qed.
-
-(* Language Theorems *)
 
 Lemma value'_is_nf: forall t',
   value' t' -> step'_normal_form_of t' t'.
@@ -231,6 +337,18 @@ Proof.
   - remember (determinism' _ _ _ H H0) as e. congruence.
 Qed.
 
+Lemma succ'_arg_normalizes: forall t1' t2',
+  step'_normal_form_of t1' t2' ->
+  multi step' (succ' t1') (succ' t2').
+Proof.
+  intros t1' t2' [Hms' Hnf'].
+  induction Hms'; subst.
+  - apply multi_refl.
+  - apply IHHms' in Hnf'.
+    eapply multi_step.
+    + apply ST_Succ'. exact H.
+    + exact Hnf'.
+Qed.
 
 (*
 On the correctness of lifting:
