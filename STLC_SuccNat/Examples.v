@@ -431,7 +431,7 @@ Proof.
         (const' (map (fun '(n0, pc0) => (S (n + n0), pc0)) k))).
       { eapply multi_step.
         - apply ST_SuccConst'.
-        - rewrite map_map_pairs. apply multi_refl. }
+        - rewrite map_map_fst. apply multi_refl. }
       apply succ'_arg_normalizes in H.
       apply (multi_step'_trans _ _ _ H H0).
 Qed.

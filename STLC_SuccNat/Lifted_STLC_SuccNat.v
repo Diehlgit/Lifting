@@ -266,7 +266,7 @@ Proof.
       apply IHspl. assumption.
 Qed.
 
-Lemma map_map_pairs: forall {A B: Type} (l: list (A*B)) (f g: A -> A),
+Lemma map_map_fst: forall {A B: Type} (l: list (A*B)) (f g: A -> A),
   map (fun '(v2, pc2) => (g v2, pc2)) (map (fun '(v1, pc1) => (f v1, pc1)) l) =
   map (fun '(v3, pc3) => (g (f v3), pc3)) l.
 Proof.
