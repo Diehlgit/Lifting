@@ -226,6 +226,18 @@ Proof.
     eassumption.
 Qed.
 
+Lemma preservation_multi: forall t t' T,
+  has_type empty t T ->
+  multi step t t' ->
+  has_type empty t' T.
+Proof.
+  intros t t' T Htype Hmulti.
+  induction Hmulti.
+  - assumption.
+  - apply (preservation _ _ _ Htype) in H.
+    apply IHHmulti. apply H.
+Qed.
+
 Theorem normal_forms_unique: forall t1 t2 t2',
   step_normal_form_of t1 t2 ->
   step_normal_form_of t1 t2' ->

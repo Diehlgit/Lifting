@@ -465,3 +465,71 @@ Proof.
   apply mapping_not_change_deriving.
   exact Hd.
 Qed.
+
+(* Developing the theorem for a analisys of type Nat -> Nat *)
+
+Lemma analisys_nf: forall t1 t2,
+  has_type empty t1 (Arrow Nat Nat) ->
+  step_normal_form_of t1 t2 ->
+  exists x T tbody, t2 = abs x T tbody.
+Proof.
+  intros t1 t2 Htype [Hmulti Hnf].
+  assert (Htype2: has_type empty t2 (Arrow Nat Nat)).
+  { apply preservation_multi with (t:=t1); assumption. }
+  assert (Hvalue: value t2).
+  { destruct (progress _ _ Htype2).
+    - assumption.
+    - apply Hnf in H as []. }
+  destruct (canonical_forms_fun _ _ _ Htype2 Hvalue) as [x [u H ] ].
+  exists x, Nat, u. assumption.
+Qed.
+
+Lemma lifted_analisys_nf: forall t1' t2',
+  has_type' empty t1' (Arrow' Nat' Nat') ->
+  step'_normal_form_of t1' t2' ->
+  exists x T' t'body, t2' = abs' x T' t'body.
+Proof.
+  intros t1' t2' Htype' [Hmulti' Hnf'].
+  assert (Htype'2: has_type' empty t2' (Arrow' Nat' Nat')).
+  { apply preservation'_multi with (t1':=t1'); assumption. }
+  assert (Hvalue': value' t2').
+  { destruct (progress' _ _ Htype'2).
+    - assumption.
+    - apply Hnf' in H as []. }
+  destruct (canonical_forms_fun' _ _ _ Htype'2 Hvalue') as [x [u' H] ].
+  exists x, Nat', u'. assumption.
+Qed.
+
+(* Proving that the commutation diagram holds for
+   any (Nat -> Nat) function.
+ *)
+
+Theorem lift_analisys_correct: forall analisys spl cfg p r r',
+  has_type empty analisys (Arrow Nat Nat) ->
+  derive spl cfg = Some p ->
+  step'_normal_form_of (app' (lift analisys) (const' spl)) (const' r') ->
+  step_normal_form_of (app analisys (const p)) (const r) ->
+  derive r' cfg = Some r.
+Proof.
+  Abort.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

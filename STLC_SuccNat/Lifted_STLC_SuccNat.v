@@ -1,6 +1,6 @@
-Require Import STLC_SuccNat.
 Require Import String List Maps.
 Import ListNotations.
+Require Import STLC_SuccNat.
 
 Open Scope string_scope.
 (* A Feature is represented by a string *)
@@ -72,7 +72,7 @@ Fixpoint lift (t:tm) : tm':=
   match t with
   | var s => (var' s)
   | abs s T t => (abs' s (lift_ty T) (lift t))
-  | STLC_SuccNat.app t1 t2 => (app' (lift t1) (lift t2))
+  | app t1 t2 => (app' (lift t1) (lift t2))
 
   | const n => (const' [(n, [[TRUE]])])
   | succ t => (succ' (lift t))
@@ -132,6 +132,9 @@ Definition step'_normal_form_of t' t'':=
 
 (* Typing *)
 Definition context' := partial_map ty'.
+
+Definition lift_context (Gamma : context) : context' :=
+  fun x => option_map lift_ty (Gamma x).
 
 Inductive has_type': context' -> tm' -> ty' -> Prop :=
   | T_Var' : forall Gamma' x T',
@@ -249,6 +252,18 @@ Proof.
     eassumption.
 Qed.
 
+Lemma preservation'_multi: forall t1' t2' T',
+  has_type' empty t1' T' ->
+  multi step' t1' t2' ->
+  has_type' empty t2' T'.
+Proof.
+  intros t1' t2' T' Htype' Hmulti.
+  induction Hmulti.
+  - assumption.
+  - apply (preservation' _ _ _ Htype') in H.
+    apply IHHmulti. apply H.
+Qed.
+
 (* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
   derive spl cfg = Some p ->
@@ -348,6 +363,71 @@ Proof.
     eapply multi_step.
     + apply ST_Succ'. exact H.
     + exact Hnf'.
+Qed.
+
+Lemma has_type'_lookup_equiv : forall Gamma1 Gamma2 t T,
+  (forall x, Gamma1 x = Gamma2 x) ->
+  has_type' Gamma1 t T ->
+  has_type' Gamma2 t T.
+Proof.
+  intros Gamma1 Gamma2 t T H_equiv H_type.
+  revert Gamma2 H_equiv.
+  induction H_type; intros Gamma2 H_equiv.
+  
+  - (* T_Var' *)
+    apply T_Var'.
+    rewrite <- H_equiv.
+    exact H.
+  - (* T_Abs' *)
+    apply T_Abs'.
+    apply IHH_type.
+    intro y.
+    unfold update.
+    destruct (String.eqb x y) eqn:Heq;
+      unfold t_update;
+      rewrite Heq.
+    + (* x = y case *) reflexivity.
+    + (* x != y case *) apply H_equiv.
+  - (* T_App' *)
+    eapply T_App'.
+    + apply IHH_type1. exact H_equiv.
+    + apply IHH_type2. exact H_equiv.
+  - (* T_Nat' *)
+    apply T_Nat'.
+  - (* T_Succ' *)
+    apply T_Succ'.
+    apply IHH_type. exact H_equiv.
+Qed.
+
+Lemma lift_context_update_lookup : forall (Gamma : partial_map ty) x T y,
+  lift_context (x |-> T ; Gamma) y = 
+  if String.eqb x y then Some (lift_ty T) else lift_context Gamma y.
+Proof.
+  intros. unfold lift_context, update.
+  destruct (eqb_spec x y).
+  - rewrite e. unfold t_update.
+    rewrite eqb_refl. simpl.
+    reflexivity.
+  - unfold t_update.
+    replace (x =? y) with false.
+    reflexivity.
+    symmetry.
+    apply (eqb_neq x y).
+    assumption.
+Qed.
+
+Theorem lifting_types: forall t T Gamma,
+  has_type Gamma t T ->
+  has_type' (lift_context Gamma) (lift t) (lift_ty T).
+Proof.
+  intros t T Gamma H. induction H;
+    simpl; econstructor; eauto.
+  - unfold lift_context.
+    rewrite H. simpl.
+    reflexivity.
+  - apply has_type'_lookup_equiv with (lift_context (x |-> T2; Gamma)).
+    + intro y. apply lift_context_update_lookup.
+    + exact IHhas_type.
 Qed.
 
 (*
