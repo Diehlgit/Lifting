@@ -1,11 +1,13 @@
 # Ignore virtual environments
-Graphs/venv/
+Graphs/
 
 # Ignore Coq build artifacts (common extensions)
 *.aux
 *.vok
 *.vos
 *.glob
+*.vo
+\#*\#
 
 # Ignore CoqIDE crash files
 *.crashcoqide
@@ -17,6 +19,7 @@ Graphs/venv/
 
 # Ignore compiled images or graphs
 *.png
+*.txt
 
 # Ignore Coq project configuration
 _CoqProject

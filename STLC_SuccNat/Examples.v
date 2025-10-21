@@ -2,6 +2,7 @@ Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
+Require Import Norm Lifted_Norm.
 
 (* Presence Condition Evaluation Examples *)
 Example pc: pc_eval ["A"; "B"] [[ (FEATURE "A") /\ (FEATURE "B") ]] = true.
@@ -154,7 +155,7 @@ Proof.
   inversion H1; subst;
     try (solve_by_inverts 1).
 
-  (* Case analisys on the feature configuration *)
+  (* Case analysis on the feature configuration *)
   simpl; simpl in Hd.
   destruct in_dec.
   - injection Hd as Hd;
@@ -200,7 +201,7 @@ Proof.
   inversion H1; subst;
     try solve_by_inverts 1.
 
-  (* Case analisys on the feature configuration *)
+  (* Case analysis on the feature configuration *)
   simpl; simpl in Hd.
   destruct in_dec; (*destruct in_dec as many times as there are features*)
   destruct in_dec;
@@ -251,7 +252,7 @@ Qed.
 Example lift_plusone_correct: forall spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift plusone) (const' spl)) (const' r') ->
-  step_normal_form_of (STLC_SuccNat.app plusone (const p)) (const r) ->
+  step_normal_form_of (app plusone (const p)) (const r) ->
   derive r' cfg = Some r.
 Proof.
   intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
@@ -466,28 +467,57 @@ Proof.
   exact Hd.
 Qed.
 
-(* Developing the theorem for a analisys of type Nat -> Nat *)
+(* Developing the theorem for a analysis of type Nat -> Nat *)
 
-Lemma analisys_nf: forall t1 t2,
+Lemma analysis_nf_aux: forall t1 t2,
   has_type empty t1 (Arrow Nat Nat) ->
   step_normal_form_of t1 t2 ->
-  exists x T tbody, t2 = abs x T tbody.
+  exists x tbody, t2 = abs x Nat tbody.
 Proof.
   intros t1 t2 Htype [Hmulti Hnf].
   assert (Htype2: has_type empty t2 (Arrow Nat Nat)).
   { apply preservation_multi with (t:=t1); assumption. }
-  assert (Hvalue: value t2).
+  assert (Hv: value t2).
   { destruct (progress _ _ Htype2).
     - assumption.
     - apply Hnf in H as []. }
-  destruct (canonical_forms_fun _ _ _ Htype2 Hvalue) as [x [u H ] ].
-  exists x, Nat, u. assumption.
+  destruct (canonical_forms_fun _ _ _ Htype2 Hv) as [x [u H ] ].
+  exists x, u. assumption.
 Qed.
 
-Lemma lifted_analisys_nf: forall t1' t2',
+Lemma app_nf_aux: forall t1 t2 n,
+  has_type empty (app t1 (const n)) Nat ->
+  step_normal_form_of (app t1 (const n)) t2 ->
+  exists r, t2 = (const r).
+Proof.
+  intros t1 t2 n Htype [Hmulti Hnf].
+  assert (Htype2: has_type empty t2 Nat).
+  { apply preservation_multi with (t:=(app t1 (const n)));
+    assumption. }
+  assert (Hv: value t2).
+  { destruct (progress _ _ Htype2).
+    - assumption.
+    - apply Hnf in H as []. }
+  destruct (canonical_forms_nat _ Htype2 Hv) as [n0 H].
+  exists n0. assumption.
+Qed.
+
+Lemma analysis_nf: forall t,
+  has_type empty t (Arrow Nat Nat) ->
+  exists x tbody, step_normal_form_of t (abs x Nat tbody).
+Proof.
+  intros t Ht.
+  apply analysis_normalization in Ht as [ v [Hm [x [vbody Habs] ] ] ].
+  exists x, vbody.
+  split.
+  - rewrite <- Habs. exact Hm.
+  - intros [t1 contra]. inversion contra.
+Qed.
+
+Lemma lifted_analysis_nf_aux: forall t1' t2',
   has_type' empty t1' (Arrow' Nat' Nat') ->
   step'_normal_form_of t1' t2' ->
-  exists x T' t'body, t2' = abs' x T' t'body.
+  exists x t'body, t2' = abs' x Nat' t'body.
 Proof.
   intros t1' t2' Htype' [Hmulti' Hnf'].
   assert (Htype'2: has_type' empty t2' (Arrow' Nat' Nat')).
@@ -497,39 +527,53 @@ Proof.
     - assumption.
     - apply Hnf' in H as []. }
   destruct (canonical_forms_fun' _ _ _ Htype'2 Hvalue') as [x [u' H] ].
-  exists x, Nat', u'. assumption.
+  exists x, u'. assumption.
 Qed.
 
-(* Proving that the commutation diagram holds for
-   any (Nat -> Nat) function.
- *)
-
-Theorem lift_analisys_correct: forall analisys spl cfg p r r',
-  has_type empty analisys (Arrow Nat Nat) ->
-  derive spl cfg = Some p ->
-  step'_normal_form_of (app' (lift analisys) (const' spl)) (const' r') ->
-  step_normal_form_of (app analisys (const p)) (const r) ->
-  derive r' cfg = Some r.
+Lemma lifted_analysis_nf: forall t',
+  has_type' empty t' (Arrow' Nat' Nat') ->
+  exists x t'body, step'_normal_form_of t' (abs' x Nat' t'body).
 Proof.
-  Abort.
+  intros t' Ht'.
+  apply analysis'_normalization' in Ht' as [v' [Hm' [x [vbody' Habs'] ] ] ].
+  exists x, vbody'.
+  split.
+  - rewrite <- Habs'. exact Hm'.
+  - intros [t1' contra]. inversion contra.
+Qed.
 
+Lemma multi_step_App1: forall t1 t2 t3,
+  multi step t1 t2 ->
+  multi step (app t1 t3) (app t2 t3).
+Proof.
+  intros t1 t2 t3 STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_App1; eauto. auto.
+Qed.
 
+Lemma app_fun_normalizes: forall t1 t2 t3 nf,
+  step_normal_form_of t1 t2 ->
+  step_normal_form_of (app t1 t3) nf ->
+  step_normal_form_of (app t2 t3) nf.
+Proof.
+  intros.
+  inversion H0; clear H0.
+  inversion H; clear H.
+  split; auto.
+  apply multi_step_App1 with (t3:=t3) in H0.
+  clear H3.
 
+  induction H0; inversion H1; subst;
+    eauto.
+  - exfalso. apply H2. exists y. auto.
+  - apply (determinism _ _ _ H) in H3. subst.
+    apply IHmulti. auto.
+Qed.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Lemma app'_fun_normalizes: forall t1' t2' v' nf',
+  step'_normal_form_of t1' t2' ->
+  value' v' ->
+  step'_normal_form_of (app' t1' v') nf' ->
+  step'_normal_form_of (app' t2' v') nf'.
+Proof. Admitted.

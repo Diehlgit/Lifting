@@ -265,12 +265,12 @@ Proof.
 Qed.
 
 (* Auxialiary Mapping theorems *)
-Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analisys:nat->nat),
+Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analysis:nat->nat),
   derive spl cfg = Some p ->
-  derive (map (fun '(n, pc) => (analisys n, pc)) spl) cfg = Some (analisys p).
+  derive (map (fun '(n, pc) => (analysis n, pc)) spl) cfg = Some (analysis p).
 Proof.
   induction spl;
-  intros cfg p analisys Hd.
+  intros cfg p analysis Hd.
   - inversion Hd.
   - destruct a. simpl in Hd.
     destruct (pc_eval cfg p0) eqn: EQ.
@@ -399,7 +399,7 @@ Proof.
     apply IHH_type. exact H_equiv.
 Qed.
 
-Lemma lift_context_update_lookup : forall (Gamma : partial_map ty) x T y,
+Lemma lift_context_update : forall (Gamma : partial_map ty) x T y,
   lift_context (x |-> T ; Gamma) y = 
   if String.eqb x y then Some (lift_ty T) else lift_context Gamma y.
 Proof.
@@ -426,22 +426,96 @@ Proof.
     rewrite H. simpl.
     reflexivity.
   - apply has_type'_lookup_equiv with (lift_context (x |-> T2; Gamma)).
-    + intro y. apply lift_context_update_lookup.
+    + intro y. apply lift_context_update.
     + exact IHhas_type.
+Qed.
+
+Lemma lifting_types_empty: forall t T,
+  has_type empty t T ->
+  has_type' empty (lift t) (lift_ty T).
+Proof.
+  intros.
+  eapply (has_type'_lookup_equiv (lift_context empty)).
+  - reflexivity.
+  - eapply lifting_types.
+    assumption.
+Qed.
+
+Lemma lift_subst_subst'_lift: forall body x t,
+  lift (subst x t body) = subst' x (lift t) (lift body).
+Proof.
+  induction body;
+    try (rename t into T);
+    intros x t; simpl.
+  - destruct (eqb_spec x s);
+    reflexivity.
+  - rewrite IHbody1.
+    rewrite IHbody2.
+    reflexivity.
+  - destruct (eqb_spec x s).
+    + reflexivity.
+    + simpl. rewrite IHbody.
+      reflexivity.
+  - reflexivity.
+  - rewrite IHbody.
+    reflexivity.
+Qed.
+
+Lemma value_value': forall v,
+  value v -> value' (lift v).
+Proof.
+  induction v; intros Hv;
+    try solve_by_inverts 2;
+    constructor.
+Qed.
+
+Lemma step_step': forall t1 t2,
+  step t1 t2 ->
+  step' (lift t1) (lift t2).
+Proof.
+  induction t1; intros t2 Hstep;
+    try solve_by_inverts 2.
+  - inversion Hstep; subst.
+    + apply IHt1_1 in H2.
+      apply ST_App1'.
+      assumption.
+    + apply IHt1_2 in H3.
+      apply ST_App2';
+        try (apply value_value' in H1);
+        assumption.
+    + rewrite lift_subst_subst'_lift.
+      apply ST_AppAbs'.
+      apply value_value'; assumption.
+  - inversion Hstep; subst.
+    + apply IHt1 in H0.
+      apply ST_Succ'; assumption.
+    + apply ST_SuccConst'.
+Qed.
+
+Lemma mstep_mstep': forall t1 t2,
+  multi step t1 t2 ->
+  multi step' (lift t1) (lift t2).
+Proof.
+  intros t1 t2 Hmulti.
+  induction Hmulti.
+  - apply multi_refl.
+  - eapply multi_step with (y:= (lift y)).
+    + apply step_step'. apply H.
+    + exact IHHmulti.
 Qed.
 
 (*
 On the correctness of lifting:
-  Given an analisys and a Software product Line spl.
-  We say that the lifting of this analisys (analisys') is correct if
-  for all derivations of spl (spl|cfg), analisys (spl|cfg) = r => (analisys' spl)|cfg = r.
+  Given an analysis and a Software product Line spl.
+  We say that the lifting of this analysis (analysis') is correct if
+  for all derivations of spl (spl|cfg), analysis (spl|cfg) = r => (analysis' spl)|cfg = r.
 *)
 
-Theorem lifting_correctness: forall (analisys:tm) (cfg:FeatureConfig) (spl r':nat') (p r:nat),
+Theorem lifting_correctness: forall (analysis:tm) (cfg:FeatureConfig) (spl r':nat') (p r:nat),
   (derive spl cfg) = Some p ->
-  step_normal_form_of (STLC_SuccNat.app analisys (const p)) (const r) ->
-  step'_normal_form_of (app' (lift analisys) (const' spl)) (const' r') ->
+  step_normal_form_of (app analysis (const p)) (const r) ->
+  step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
   (derive r' cfg) = Some r.
 Proof.
-  intros analisys cfg spl r' p r Hd [Hmstep Hnf] [Hmstep' Hnf'].
+  intros analysis cfg spl r' p r Hd [Hmstep Hnf] [Hmstep' Hnf'].
   Abort.
