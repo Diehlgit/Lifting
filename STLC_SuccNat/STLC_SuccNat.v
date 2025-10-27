@@ -283,3 +283,21 @@ Proof.
     + exact H.
     + exact H23.
 Qed.
+
+Lemma multistep_App2 : forall v t t',
+  value v -> (multi step t t') -> multi step (app v t) (app v t').
+Proof.
+  intros v t t' V STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_App2; eauto.  auto.
+Qed.
+
+Lemma multistep_succ : forall t t',
+  multi step t t' -> multi step (succ t) (succ t').
+Proof.
+  intros t t' STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_Succ; eauto.  auto.
+Qed.

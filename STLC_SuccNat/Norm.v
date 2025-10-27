@@ -1,7 +1,7 @@
 Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
-Require Import Lifted_STLC_SuccNat.
+Require Import Enviroments.
 
 Hint Constructors multi : core.
 Hint Constructors value : core.
@@ -61,11 +61,11 @@ Proof.
       auto.
 Qed.
 
-Theorem false_eqb_string : forall x y : string,
-   x <> y -> String.eqb x y = false.
-Proof.
-  intros x y. rewrite String.eqb_neq.
-  intros H. apply H. Qed.
+Ltac false_eqb_string :=
+  try match goal with
+      | [ H: (?x <> ?y)%string |- _ ] => apply eqb_neq in H; rewrite H in *
+      | [ H: ?x <> ?y |- _ ] => apply eqb_neq in H; rewrite H in *
+  end.
 
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
@@ -77,7 +77,7 @@ Proof with eauto.
   - (* T_Abs *)
     destruct IHHtyp as [T' Hctx]... exists T'.
     unfold update, t_update in Hctx.
-    rewrite false_eqb_string in Hctx...
+    false_eqb_string...
 Qed.
 
 Corollary typable_empty__closed : forall t T,
@@ -95,6 +95,7 @@ Fixpoint R (T:ty) (t:tm) : Prop :=
     | Arrow T1 T2 => (forall s, R T1 s -> R T2 (app t s))
     end).
 
+(* Proving that the relation has the wanted property *)
 Lemma R_halts : forall {T} {t}, R T t -> halts t.
 Proof.
   intros.
@@ -107,6 +108,8 @@ Proof.
   destruct T; unfold R in H; destruct H as [H _]; assumption.
 Qed.
 
+(* Proving some lemmas about relation preservation under
+   language evaluation *)
 Lemma step_preserves_halting :
   forall t t', (step t t') -> (halts t <-> halts t').
 Proof.
@@ -178,14 +181,6 @@ Proof.
     eapply preservation;  eauto. auto.
 Qed.
 
-Definition env := list (string * tm).
-
-Fixpoint msubst (ss:env) (t:tm) : tm :=
-  match ss with
-  | nil => t
-  | ((x,s)::ss') => msubst ss' (subst x s t)
-  end.
-
 Lemma vacuous_substitution : forall  t x,
      ~ appears_free_in x t  ->
      forall t', subst x t' t = t.
@@ -230,38 +225,6 @@ Fixpoint closed_env (env:env) :=
   | (x,t)::env' => closed t /\ closed_env env'
   end.
 
-Definition tass := list (string * ty).
-
-Fixpoint mupdate (Gamma:context) (xts:tass) :=
-  match xts with
-  | nil => Gamma
-  | ((x,v)::xts') => update (mupdate Gamma xts') x v
-  end.
-
-Fixpoint lookup {X:Set} (k:string) (l:list(string * X)) : option X :=
-  match l with
-  | nil => None
-  | (j,x) :: l' => if eqb j k then Some x else lookup k l'
-  end.
-
-Lemma mupdate_lookup : forall (c:tass) (x:string),
-  lookup x c = (mupdate empty c) x.
-Proof.
-  induction c; intros.
-    auto.
-    destruct a. unfold lookup, mupdate, update, t_update. destruct (eqb s x);
- auto.
-Qed.
-
-Fixpoint drop {X:Set} (n:string) (nxs:list (string * X))
-            : list (string * X) :=
-  match nxs with
-    | nil => nil
-    | ((n',x)::nxs') =>
-        if String.eqb n' n then drop n nxs'
-        else (n',x)::(drop n nxs')
-  end.
-
 Lemma subst_not_afi : forall t x v,
     closed v ->  ~ appears_free_in x (subst x v t).
 Proof with eauto.  (* rather slow this way *)
@@ -299,15 +262,15 @@ Proof with eauto.
    + subst. exfalso...
    + subst. simpl. rewrite String.eqb_refl. apply subst_closed...
    + subst. simpl. rewrite String.eqb_refl. rewrite subst_closed...
-   + simpl. rewrite false_eqb_string... rewrite false_eqb_string...
+   + simpl. apply eqb_neq in n, n0. rewrite n, n0...
   - (* app *)
    rewrite IHt1, IHt2...
   - (* abs *)
    destruct (eqb_spec x s); destruct (eqb_spec x1 s).
    + subst. exfalso...
-   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string...
-   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string...
-   + simpl. rewrite false_eqb_string... rewrite false_eqb_string...
+   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n...
+   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n...
+   + simpl. apply eqb_neq in n, n0; rewrite n, n0...
      rewrite IHt...
   - (* const *)
    reflexivity.
@@ -318,26 +281,12 @@ Qed.
 Lemma subst_msubst: forall env x v t, closed v -> closed_env env ->
     msubst env (subst x v t) = subst x v (msubst (drop x env) t) .
 Proof.
-  induction env0; intros; auto.
+  induction env; intros; auto.
   destruct a. simpl.
   inversion H0.
   destruct (eqb_spec s x).
   - subst. rewrite duplicate_subst; auto.
   - simpl. rewrite swap_subst; eauto.
-Qed.
-
-Lemma mupdate_drop : forall (c: tass) Gamma x x',
-      mupdate Gamma (drop x c) x'
-    = if String.eqb x x' then Gamma x' else mupdate Gamma c x'.
-Proof.
-  induction c; intros.
-  - destruct (eqb_spec x x'); auto.
-  - destruct a. simpl.
-    destruct (eqb_spec s x).
-    + subst. rewrite IHc.
-      unfold update, t_update. destruct (eqb_spec x x'); auto.
-    + simpl. unfold update, t_update. destruct (eqb_spec s x'); auto.
-      subst. rewrite false_eqb_string; congruence.
 Qed.
 
 Inductive instantiation : tass -> env -> Prop :=
@@ -406,60 +355,6 @@ Proof.
         apply IHss. inversion H; auto.
 Qed.
 
-Lemma msubst_abs: forall ss x T t,
-  msubst ss (abs x T t) = (abs x T (msubst (drop x ss) t)).
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-      simpl. destruct (String.eqb s x); simpl; auto.
-Qed.
-
-Lemma msubst_app : forall ss t1 t2,
-    msubst ss (app t1 t2) = app (msubst ss t1) (msubst ss t2).
-Proof.
- induction ss; intros.
-   reflexivity.
-   destruct a.
-    simpl. rewrite <- IHss. reflexivity.
-Qed.
-
-Lemma msubst_const : forall ss n,
-  msubst ss (const n) = const n.
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-    simpl. apply IHss.
-Qed.
-
-Lemma msubst_succ : forall ss t,
-  msubst ss (succ t) = succ (msubst ss t).
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-    simpl. apply IHss.
-Qed.
-
-Lemma multistep_App2 : forall v t t',
-  value v -> (multi step t t') -> multi step (app v t) (app v t').
-Proof.
-  intros v t t' V STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_App2; eauto.  auto.
-Qed.
-
-Lemma multistep_succ : forall t t',
-  multi step t t' -> multi step (succ t) (succ t').
-Proof.
-  intros t t' STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_Succ; eauto.  auto.
-Qed.
-
 Lemma msubst_preserves_typing : forall c e,
   instantiation c e->
   forall Gamma t S, has_type (mupdate Gamma c) t S ->
@@ -503,7 +398,7 @@ Proof.
           + auto.
           + rewrite H.
             clear - c n. induction c.
-            simpl.  rewrite false_eqb_string; auto.
+            simpl. false_eqb_string; auto.
             simpl. destruct a.  unfold update, t_update.
             destruct (String.eqb s x0); auto. }
         unfold R. fold R. split.

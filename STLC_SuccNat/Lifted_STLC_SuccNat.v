@@ -1,51 +1,7 @@
 Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
-
-Open Scope string_scope.
-(* A Feature is represented by a string *)
-Definition Feature := string.
-
-(*A Feature Configuration is a list of features *)
-Definition FeatureConfig := list Feature.
-
-(* A Presence Condition is a Boolean expression over features *)
-Inductive PresenceCondition : Type :=
-  | PC_Feature : Feature -> PresenceCondition
-  | PC_And     : PresenceCondition -> PresenceCondition -> PresenceCondition
-  | PC_Or      : PresenceCondition -> PresenceCondition -> PresenceCondition
-  | PC_Not     : PresenceCondition -> PresenceCondition
-  | PC_True    : PresenceCondition
-  | PC_False   : PresenceCondition.
-
-Declare Custom Entry pc_syntax.
-
-Notation "x" := x (in custom pc_syntax at level 0, x constr).
-Notation "'FEATURE' f" := (PC_Feature f)
-  (in custom pc_syntax at level 0, f constr).
-Notation "x '/\' y" := (PC_And x y)
-  (in custom pc_syntax at level 40, left associativity).
-Notation "x '\/' y" := (PC_Or x y)
-  (in custom pc_syntax at level 50, left associativity).
-Notation "'~' x" := (PC_Not x)
-  (in custom pc_syntax at level 35, right associativity).
-Notation "'TRUE'" := PC_True (in custom pc_syntax at level 0).
-Notation "'FALSE'" := PC_False (in custom pc_syntax at level 0).
-Notation "'(' x ')'" := x
-  (in custom pc_syntax, x at level 0).
-Notation "'[[' x ']]'" := x
-  (at level 0, x custom pc_syntax at level 99).
-
-(* Function that evaluates a Presence Condition given a Feature Configuration *)
-Fixpoint pc_eval (cfg : FeatureConfig) (pc : PresenceCondition) : bool :=
-  match pc with
-  | PC_Feature f => if in_dec String.string_dec f cfg then true else false
-  | PC_And p1 p2 => pc_eval cfg p1 && pc_eval cfg p2
-  | PC_Or  p1 p2 => pc_eval cfg p1 || pc_eval cfg p2
-  | PC_Not p1   => negb (pc_eval cfg p1)
-  | PC_True => true
-  | PC_False => false
-  end.
+Require Import Presence_Conditions.
 
 (* Automatic lifting *)
 Inductive ty' : Type :=
@@ -58,7 +14,7 @@ Fixpoint lift_ty (T : ty) : ty' :=
     | Arrow T1 T2 => Arrow' (lift_ty T1) (lift_ty T2)
   end.
 
-Definition nat' := list (nat * PresenceCondition).
+Definition nat' := variational_value nat.
 
 Inductive tm' :=
   | var' : string -> tm'
@@ -74,26 +30,8 @@ Fixpoint lift (t:tm) : tm':=
   | abs s T t => (abs' s (lift_ty T) (lift t))
   | app t1 t2 => (app' (lift t1) (lift t2))
 
-  | const n => (const' [(n, [[TRUE]])])
+  | const n => (const' [(n, pc_True)])
   | succ t => (succ' (lift t))
-  end.
-
-Fixpoint derive (n' : nat') (cfg : FeatureConfig) : option nat :=
-  match n' with
-  | [] => None
-  | (n, pc) :: rest =>
-    if pc_eval cfg pc then Some n
-    else derive rest cfg
-  end.
-
-Definition disjoint (pc1 pc2 : PresenceCondition) : Prop :=
-  forall (cfg : FeatureConfig), ~(pc_eval cfg pc1 = true /\ pc_eval cfg pc2 = true).
-
-Fixpoint disjointness (l : nat') : Prop :=
-  match l with
-  | [] => True
-  | (_, pc) :: rest =>
-      (forall t' pc', In (t', pc') rest -> disjoint pc pc') /\ disjointness rest
   end.
 
 Inductive value' : tm' -> Prop :=
@@ -265,7 +203,7 @@ Proof.
 Qed.
 
 (* Auxialiary Mapping theorems *)
-Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:FeatureConfig) (p:nat) (analysis:nat->nat),
+Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:feat_config) (p:nat) (analysis:nat->nat),
   derive spl cfg = Some p ->
   derive (map (fun '(n, pc) => (analysis n, pc)) spl) cfg = Some (analysis p).
 Proof.
@@ -409,11 +347,8 @@ Proof.
     rewrite eqb_refl. simpl.
     reflexivity.
   - unfold t_update.
-    replace (x =? y) with false.
-    reflexivity.
-    symmetry.
-    apply (eqb_neq x y).
-    assumption.
+    apply eqb_neq in n;
+    rewrite n; auto.
 Qed.
 
 Theorem lifting_types: forall t T Gamma,
@@ -504,18 +439,20 @@ Proof.
     + exact IHHmulti.
 Qed.
 
-(*
-On the correctness of lifting:
-  Given an analysis and a Software product Line spl.
-  We say that the lifting of this analysis (analysis') is correct if
-  for all derivations of spl (spl|cfg), analysis (spl|cfg) = r => (analysis' spl)|cfg = r.
-*)
-
-Theorem lifting_correctness: forall (analysis:tm) (cfg:FeatureConfig) (spl r':nat') (p r:nat),
-  (derive spl cfg) = Some p ->
-  step_normal_form_of (app analysis (const p)) (const r) ->
-  step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
-  (derive r' cfg) = Some r.
+Lemma multistep'_App2' : forall v' t' t1',
+  value' v' -> (multi step' t' t1') -> multi step' (app' v' t') (app' v' t1').
 Proof.
-  intros analysis cfg spl r' p r Hd [Hmstep Hnf] [Hmstep' Hnf'].
-  Abort.
+  intros v t t' V STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_App2'; eauto.  auto.
+Qed.
+
+Lemma multistep'_succ' : forall t' t1',
+  multi step' t' t1' -> multi step' (succ' t') (succ' t1').
+Proof.
+  intros t t' STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_Succ'; eauto.  auto.
+Qed.

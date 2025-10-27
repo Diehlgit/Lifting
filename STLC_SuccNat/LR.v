@@ -1,11 +1,10 @@
-Require Import List Maps.
+Require Import List Maps Presence_Conditions.
 Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
-Require Import Examples.
 Import ListNotations.
 Require Import Norm Lifted_Norm.
 
-Fixpoint LR (cfg:FeatureConfig) (T:ty) (t:tm) (t':tm') : Prop :=
+Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   has_type empty t T /\ has_type' empty t' (lift_ty T) /\
   match T with
   | Nat => exists r r',
@@ -17,97 +16,12 @@ Fixpoint LR (cfg:FeatureConfig) (T:ty) (t:tm) (t':tm') : Prop :=
             LR cfg T2 (app t arg) (app' t' arg')
   end.
 
-Example LR_plusone: forall cfg, LR cfg (Arrow Nat Nat) plusone (lift plusone).
-Proof.
-  intros. unfold plusone, LR;
-  split; [|split]; simpl; eauto.
-  intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
-  split; [eauto|split]; eauto.
-  eexists; eexists.
-  split; [|split].
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step_trans.
-      eapply multistep_App2; eauto.
-      normalize.
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step'_trans.
-      eapply multistep'_App2'; eauto.
-      normalize.
-  - eapply mapping_not_change_deriving. assumption.
-Qed.
-
-Example LR_plustwo: forall cfg, LR cfg (Arrow Nat Nat) plustwo (lift plustwo).
-Proof.
-  intros. unfold plustwo, LR;
-  split; [|split]; simpl; eauto.
-  intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
-  split; [eauto|split]; eauto.
-  eexists; eexists.
-  split; [|split].
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step_trans.
-      eapply multistep_App2; eauto.
-      eapply multi_step.
-      auto. simpl. eapply multi_step.
-      auto. eapply multi_step.
-      auto. apply multi_refl.
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step'_trans.
-      eapply multistep'_App2'; eauto.
-      eapply multi_step.
-      auto. simpl. eapply multi_step.
-      auto. eapply multi_step.
-      auto. apply multi_refl.
-  - eapply mapping_not_change_deriving.
-    eapply mapping_not_change_deriving.
-    assumption.
-Qed.
-
-Example LR_plusn: forall n cfg, LR cfg (Arrow Nat Nat) (plusn n) (lift (plusn n)).
-Proof.
-  intros. unfold LR.
-  split; [|split;
-  [| intros arg arg' [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd] ] ] ] ] ];
-     split; [|split; [|eexists;eexists;split; [|split] ] ]
-  ] ].
-  - unfold plusn. constructor.
-    induction n; simpl; auto.
-  - unfold plusn. simpl. constructor.
-    induction n; simpl; auto.
-  - unfold plusn. econstructor; eauto.
-    induction n; simpl; auto.
-    constructor. constructor.
-    inversion IHn; subst. auto.
-  - unfold plusn. simpl.
-    econstructor; eauto.
-    induction n; simpl; auto.
-    constructor; constructor.
-    inversion IHn; subst. auto.
-  - assert (Hms: multi step (app (plusn n) arg) (app (plusn n) (const r))).
-    { eapply multistep_App2.
-      induction n; unfold plusn; auto.
-      destruct Hsnf. assumption. }
-    pose proof (normal_form_plusn n r) as [Hms0 _].
-    pose proof (multi_step_trans _ _ _ Hms Hms0).
-    split; [|intros [x contra]; inversion contra].
-    eassumption.
-  - assert (Hms': multi step' (app' (lift (plusn n)) arg') (app' (lift (plusn n)) (const' r'))).
-    { eapply multistep'_App2'.
-      induction n; unfold plusn; simpl; auto.
-      destruct Hsnf'. assumption. }
-    pose proof (normal_form'_lift_plusn n r') as [Hms0' _].
-    pose proof (multi_step'_trans _ _ _ Hms' Hms0').
-    split; [|intros [x contra]; inversion contra].
-    eassumption.
-  - apply mapping_not_change_deriving. assumption.
-Qed.
-
 Lemma LR_typable_empty : forall {cfg} {T} {t} {t'},
   LR cfg T t t' ->
   has_type empty t T /\ has_type' empty t' (lift_ty T).
 Proof.
   intros.
-  destruct T; unfold R in H; split;
+  destruct T; unfold LR in H; split;
     try (destruct H as [H _]; assumption);
     destruct H as [_ [H _] ]; assumption.
 Qed.
@@ -314,7 +228,9 @@ Proof.
   assumption.
 Qed.
 
-Inductive instantiation : FeatureConfig -> tass -> env -> env' -> Prop :=
+Require Import Enviroments.
+
+Inductive instantiation : feat_config -> tass -> env -> env' -> Prop :=
   | V_nil : forall cfg, instantiation cfg nil nil nil
   | V_cons : forall cfg x T v v' c e e',
     instantiation cfg c e e'->
@@ -446,8 +362,6 @@ Proof.
     destruct (instantiation_domains_match V H) as [t [P [t' P'] ] ].
     eapply instantiation_LR; eauto.
     * rewrite msubst_var.
-      replace (Norm.lookup x env0) with (lookup x env0)
-      by reflexivity.
       rewrite P; reflexivity.
       eapply instantiation_env_closed; eauto.
     * rewrite msubst'_var'.
@@ -455,7 +369,7 @@ Proof.
       eapply instantiation_env_closed; eauto.
   - (* T_Abs *)
     rewrite msubst_abs, msubst'_abs'.
-    assert (Hty: has_type empty (abs x T2 (msubst (Norm.drop x env0) t)) (Arrow T2 T1)).
+    assert (Hty: has_type empty (abs x T2 (msubst (drop x env0) t)) (Arrow T2 T1)).
     { apply T_Abs. eapply msubst_preserves_typing.
       apply instantiation_drop; eauto.
       eapply context_invariance. apply HT.
@@ -523,7 +437,7 @@ Proof.
     split; [|split].
     rewrite msubst_const. auto.
     rewrite msubst'_const'. auto.
-    exists n, [(n,[[TRUE]])].
+    exists n, [(n,pc_True)].
     split; [|split].
     + rewrite msubst_const. split;
         [eapply multi_refl

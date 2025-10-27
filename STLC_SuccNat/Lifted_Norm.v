@@ -2,6 +2,7 @@ Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
+Require Import Enviroments.
 
 Hint Constructors multi : core.
 Hint Constructors value' : core.
@@ -178,14 +179,6 @@ Proof.
     eapply preservation';  eauto. auto.
 Qed.
 
-Definition env' := list (string * tm').
-
-Fixpoint msubst' (ss:env') (t':tm') : tm' :=
-  match ss with
-  | nil => t'
-  | ((x,s)::ss') => msubst' ss' (subst' x s t')
-  end.
-
 Lemma vacuous_substitution' : forall  t' x,
      ~ appears_free_in' x t'  ->
      forall t1', subst' x t1' t' = t'.
@@ -228,38 +221,6 @@ Fixpoint closed'_env' (env':env') :=
   match env' with
   | nil => True
   | (x,t')::env1' => closed' t' /\ closed'_env' env1'
-  end.
-
-Definition tass' := list (string * ty').
-
-Fixpoint mupdate' (Gamma':context') (xts:tass') :=
-  match xts with
-  | nil => Gamma'
-  | ((x,v)::xts') => update (mupdate' Gamma' xts') x v
-  end.
-
-Fixpoint lookup {X:Set} (k:string) (l:list(string * X)) : option X :=
-  match l with
-  | nil => None
-  | (j,x) :: l' => if eqb j k then Some x else lookup k l'
-  end.
-
-Lemma mupdate'_lookup : forall (c:tass') (x:string),
-  lookup x c = (mupdate' empty c) x.
-Proof.
-  induction c; intros.
-    auto.
-    destruct a. unfold lookup, mupdate', update, t_update. destruct (eqb s x);
- auto.
-Qed.
-
-Fixpoint drop {X:Set} (n:string) (nxs:list (string * X))
-            : list (string * X) :=
-  match nxs with
-    | nil => nil
-    | ((n',x)::nxs') =>
-        if String.eqb n' n then drop n nxs'
-        else (n',x)::(drop n nxs')
   end.
 
 Lemma subst'_not_afi' : forall t' x v',
@@ -318,26 +279,12 @@ Qed.
 Lemma subst'_msubst': forall env' x v' t', closed' v' -> closed'_env' env' ->
     msubst' env' (subst' x v' t') = subst' x v' (msubst' (drop x env') t') .
 Proof.
-  induction env'0; intros; auto.
+  induction env'; intros; auto.
   destruct a. simpl.
   inversion H0.
   destruct (eqb_spec s x).
   - subst. rewrite duplicate_subst'; auto.
   - simpl. rewrite swap_subst'; eauto.
-Qed.
-
-Lemma mupdate'_drop : forall (c: tass') Gamma' x x',
-      mupdate' Gamma' (drop x c) x'
-    = if String.eqb x x' then Gamma' x' else mupdate' Gamma' c x'.
-Proof.
-  induction c; intros.
-  - destruct (eqb_spec x x'); auto.
-  - destruct a. simpl.
-    destruct (eqb_spec s x).
-    + subst. rewrite IHc.
-      unfold update, t_update. destruct (eqb_spec x x'); auto.
-    + simpl. unfold update, t_update. destruct (eqb_spec s x'); auto.
-      subst. rewrite false_eqb_string; congruence.
 Qed.
 
 Inductive instantiation' : tass' -> env' -> Prop :=
@@ -404,60 +351,6 @@ Proof.
       simpl. destruct (eqb s x).
         apply msubst'_closed'. inversion H; auto.
         apply IHss. inversion H; auto.
-Qed.
-
-Lemma msubst'_abs': forall ss x T' t',
-  msubst' ss (abs' x T' t') = (abs' x T' (msubst' (drop x ss) t')).
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-      simpl. destruct (String.eqb s x); simpl; auto.
-Qed.
-
-Lemma msubst'_app' : forall ss t1' t2',
-    msubst' ss (app' t1' t2') = app' (msubst' ss t1') (msubst' ss t2').
-Proof.
- induction ss; intros.
-   reflexivity.
-   destruct a.
-    simpl. rewrite <- IHss. reflexivity.
-Qed.
-
-Lemma msubst'_const' : forall ss n,
-  msubst' ss (const' n) = const' n.
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-    simpl. apply IHss.
-Qed.
-
-Lemma msubst'_succ' : forall ss t',
-  msubst' ss (succ' t') = succ' (msubst' ss t').
-Proof.
-  induction ss; intros.
-    reflexivity.
-    destruct a.
-    simpl. apply IHss.
-Qed.
-
-Lemma multistep'_App2' : forall v' t' t1',
-  value' v' -> (multi step' t' t1') -> multi step' (app' v' t') (app' v' t1').
-Proof.
-  intros v t t' V STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_App2'; eauto.  auto.
-Qed.
-
-Lemma multistep'_succ' : forall t' t1',
-  multi step' t' t1' -> multi step' (succ' t') (succ' t1').
-Proof.
-  intros t t' STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_Succ'; eauto.  auto.
 Qed.
 
 Lemma msubst'_preserves_typing : forall c e,

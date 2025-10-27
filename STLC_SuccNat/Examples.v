@@ -1,25 +1,28 @@
-Require Import String List Maps.
+Require Import List String.
+Require Import Presence_Conditions.
+
 Import ListNotations.
-Require Import STLC_SuccNat.
-Require Import Lifted_STLC_SuccNat.
-Require Import Norm Lifted_Norm.
+
+Open Scope string_scope.
 
 (* Presence Condition Evaluation Examples *)
-Example pc: pc_eval ["A"; "B"] [[ (FEATURE "A") /\ (FEATURE "B") ]] = true.
+                               (* A /\ B *)
+Example pc: pc_eval ["A"; "B"] (pc_And (pc_Feature "A") (pc_Feature "B")) = true.
+Proof. reflexivity. Qed.
+                                (* ~ C *)
+Example pc2: pc_eval [] (pc_Not (pc_Feature "C")) = true.
+Proof. reflexivity. Qed.
+                                     (* A /\ (~B \/ C) *)
+Example pc3: pc_eval ["A"; "B"; "C"] (pc_And (pc_Feature "A") (pc_Or (pc_Not (pc_Feature "B")) (pc_Feature "C"))) = true.
+Proof. reflexivity. Qed.
+                           (* TRUE /\ A *)
+Example pc4: pc_eval ["A"] (pc_And pc_True (pc_Feature "A")) = true.
+Proof. reflexivity. Qed.
+                           (* FALSE /\ A *)
+Example pc5: pc_eval ["A"] (pc_And pc_False (pc_Feature "A")) = false.
 Proof. reflexivity. Qed.
 
-Example pc2: pc_eval [] [[ ~ FEATURE "C" ]] = true.
-Proof. reflexivity. Qed.
-
-Example pc3: pc_eval ["A"; "B"; "C"] [[ (FEATURE "A") /\ ~ (FEATURE "B") \/ (FEATURE "C") ]] = true.
-Proof. reflexivity. Qed.
-
-Example pc4: pc_eval ["A"] [[ TRUE /\ (FEATURE "A") ]] = true.
-Proof. reflexivity. Qed.
-
-Example pc5: pc_eval ["A"] [[ FALSE /\ (FEATURE "A") ]] = false.
-Proof. reflexivity. Qed.
-
+Require Import STLC_SuccNat Maps.
 (*Example functions plusone and plustwo*)
 Definition plusone := abs "n" Nat (succ (var "n")).
 
@@ -66,8 +69,10 @@ Proof.
   - intros [t' Contra]. inversion Contra.
 Qed.
 
+Require Import Lifted_STLC_SuccNat.
+
 (*Automatic Lifting Examples*)
-Example const1': lift (const 1) = const' [(1, [[TRUE]])].
+Example const1': lift (const 1) = const' [(1, pc_True)].
 Proof. simpl. reflexivity. Qed.
 
 Example plusone': lift plusone = abs' "n" Nat' (succ' (var' "n")).
@@ -75,44 +80,24 @@ Proof. simpl. reflexivity. Qed.
 
 (*Some SPLs examples*)
 Definition x':= [
-   (1, [[FEATURE "A"]]);
-   (2, [[~ (FEATURE "A") /\ (FEATURE "B")]]);
-   (3, [[~ (FEATURE "A") /\ ~ (FEATURE "B")]])
+       (* A *)
+   (1, pc_Feature "A");
+       (* (~ A) /\ B *)
+   (2, pc_And (pc_Not (pc_Feature "A")) (pc_Feature "B"));
+       (*  (~ A) /\ (~B) *)
+   (3, pc_And (pc_Not (pc_Feature "A")) (pc_Not (pc_Feature "B")) )
   ].
 
 Definition y' := [
-    (5, [[(FEATURE "A") /\ ~ (FEATURE "B")]]);
-    (4, [[FEATURE "B"]]);
-    (3, [[~(FEATURE "A") /\ ~(FEATURE "B")]])
+        (* A /\ (~B) *)
+    (5, pc_And (pc_Feature "A") (pc_Not (pc_Feature "B")));
+        (* B *)
+    (4, pc_Feature "B");
+        (* (~A) /\ (~B) *)
+    (3, pc_And (pc_Not (pc_Feature "A")) (pc_Not (pc_Feature "B")) )
   ].
 
-Definition z' := [ (19, [[TRUE]]) ].
-
-(*Disjointness Invariant Exapmles*)
-Lemma disjointness_x': disjointness x'.
-Proof.
-  unfold disjointness.
-  simpl. split.
-  - intros t' pc' [].
-    + injection H as []. rewrite <- H.
-      unfold disjoint; intros cfg [].
-      simpl in H0, H1.
-      destruct in_dec; discriminate.
-    + destruct H.
-      * injection H as []. rewrite <- H.
-        intros cfg []. simpl in H0, H1.
-        destruct in_dec; discriminate.
-      * destruct H.
-  - split.
-    + intros t' pc' [].
-      * injection H as []. rewrite <- H.
-        intros cfg []. simpl in H0, H1.
-        destruct in_dec; destruct in_dec; discriminate.
-      * destruct H.
-    + split.
-      * intros. destruct H.
-      * apply I.
-Qed.
+Definition z' := [ (19, pc_True) ].
 
 Ltac solve_by_inverts n :=
 	match goal with | H : ?T  |-  _  =>
@@ -123,7 +108,7 @@ Ltac solve_by_inverts n :=
 	end end.
 
 (* plusone(x'|p) = (plusone'(x'))|p *)
-Example comm_plusone_x': forall (cfg:FeatureConfig) (x n:nat) (n':nat'),
+Example comm_plusone_x': forall (cfg:feat_config) (x n:nat) (n':nat'),
   (derive x' cfg ) = Some x ->
   step_normal_form_of (STLC_SuccNat.app plusone (const x)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' x')) (const' n') ->
@@ -166,7 +151,7 @@ Proof.
 Qed.
 
 (* plusone(y'|p) = (plusone'(y'))|p *)
-Example comm_plusone_y: forall (cfg:FeatureConfig) (y n: nat) (n':nat'),
+Example comm_plusone_y: forall (cfg:feat_config) (y n: nat) (n':nat'),
   (derive y' cfg) = Some y ->
   step_normal_form_of (STLC_SuccNat.app plusone (const y)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' y')) (const' n') ->
@@ -210,7 +195,7 @@ Proof.
 Qed.
 
 (* plusone(z'|p) = (plusone'(z'))|p *)
-Example comm_plusone_z: forall (cfg:FeatureConfig) (z n: nat) (n':nat'),
+Example comm_plusone_z: forall (cfg:feat_config) (z n: nat) (n':nat'),
   (derive z' cfg) = Some z ->
   step_normal_form_of (STLC_SuccNat.app plusone (const z)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' z')) (const' n') ->
@@ -467,113 +452,91 @@ Proof.
   exact Hd.
 Qed.
 
-(* Developing the theorem for a analysis of type Nat -> Nat *)
+Require Import Norm Lifted_Norm LR.
 
-Lemma analysis_nf_aux: forall t1 t2,
-  has_type empty t1 (Arrow Nat Nat) ->
-  step_normal_form_of t1 t2 ->
-  exists x tbody, t2 = abs x Nat tbody.
+(* LR examples *)
+
+Example LR_plusone: forall cfg, LR cfg (Arrow Nat Nat) plusone (lift plusone).
 Proof.
-  intros t1 t2 Htype [Hmulti Hnf].
-  assert (Htype2: has_type empty t2 (Arrow Nat Nat)).
-  { apply preservation_multi with (t:=t1); assumption. }
-  assert (Hv: value t2).
-  { destruct (progress _ _ Htype2).
-    - assumption.
-    - apply Hnf in H as []. }
-  destruct (canonical_forms_fun _ _ _ Htype2 Hv) as [x [u H ] ].
-  exists x, u. assumption.
+  intros. unfold plusone, LR;
+  split; [|split]; simpl; eauto.
+  intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
+  split; [eauto|split]; eauto.
+  eexists; eexists.
+  split; [|split].
+  - split; [|intros [x contra]; inversion contra].
+    eapply multi_step_trans.
+      eapply multistep_App2; eauto.
+      normalize.
+  - split; [|intros [x contra]; inversion contra].
+    eapply multi_step'_trans.
+      eapply multistep'_App2'; eauto.
+      normalize.
+  - eapply mapping_not_change_deriving. assumption.
 Qed.
 
-Lemma app_nf_aux: forall t1 t2 n,
-  has_type empty (app t1 (const n)) Nat ->
-  step_normal_form_of (app t1 (const n)) t2 ->
-  exists r, t2 = (const r).
+Example LR_plustwo: forall cfg, LR cfg (Arrow Nat Nat) plustwo (lift plustwo).
 Proof.
-  intros t1 t2 n Htype [Hmulti Hnf].
-  assert (Htype2: has_type empty t2 Nat).
-  { apply preservation_multi with (t:=(app t1 (const n)));
-    assumption. }
-  assert (Hv: value t2).
-  { destruct (progress _ _ Htype2).
-    - assumption.
-    - apply Hnf in H as []. }
-  destruct (canonical_forms_nat _ Htype2 Hv) as [n0 H].
-  exists n0. assumption.
+  intros. unfold plustwo, LR;
+  split; [|split]; simpl; eauto.
+  intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
+  split; [eauto|split]; eauto.
+  eexists; eexists.
+  split; [|split].
+  - split; [|intros [x contra]; inversion contra].
+    eapply multi_step_trans.
+      eapply multistep_App2; eauto.
+      eapply multi_step.
+      auto. simpl. eapply multi_step.
+      auto. eapply multi_step.
+      auto. apply multi_refl.
+  - split; [|intros [x contra]; inversion contra].
+    eapply multi_step'_trans.
+      eapply multistep'_App2'; eauto.
+      eapply multi_step.
+      auto. simpl. eapply multi_step.
+      auto. eapply multi_step.
+      auto. apply multi_refl.
+  - eapply mapping_not_change_deriving.
+    eapply mapping_not_change_deriving.
+    assumption.
 Qed.
 
-Lemma analysis_nf: forall t,
-  has_type empty t (Arrow Nat Nat) ->
-  exists x tbody, step_normal_form_of t (abs x Nat tbody).
+Example LR_plusn: forall n cfg, LR cfg (Arrow Nat Nat) (plusn n) (lift (plusn n)).
 Proof.
-  intros t Ht.
-  apply analysis_normalization in Ht as [ v [Hm [x [vbody Habs] ] ] ].
-  exists x, vbody.
-  split.
-  - rewrite <- Habs. exact Hm.
-  - intros [t1 contra]. inversion contra.
+  intros. unfold LR.
+  split; [|split;
+  [| intros arg arg' [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd] ] ] ] ] ];
+     split; [|split; [|eexists;eexists;split; [|split] ] ]
+  ] ].
+  - unfold plusn. constructor.
+    induction n; simpl; auto.
+  - unfold plusn. simpl. constructor.
+    induction n; simpl; auto.
+  - unfold plusn. econstructor; eauto.
+    induction n; simpl; auto.
+    constructor. constructor.
+    inversion IHn; subst. auto.
+  - unfold plusn. simpl.
+    econstructor; eauto.
+    induction n; simpl; auto.
+    constructor; constructor.
+    inversion IHn; subst. auto.
+  - assert (Hms: multi step (app (plusn n) arg) (app (plusn n) (const r))).
+    { eapply multistep_App2.
+      induction n; unfold plusn; auto.
+      destruct Hsnf. assumption. }
+    pose proof (normal_form_plusn n r) as [Hms0 _].
+    pose proof (multi_step_trans _ _ _ Hms Hms0).
+    split; [|intros [x contra]; inversion contra].
+    eassumption.
+  - assert (Hms': multi step' (app' (lift (plusn n)) arg') (app' (lift (plusn n)) (const' r'))).
+    { eapply multistep'_App2'.
+      induction n; unfold plusn; simpl; auto.
+      destruct Hsnf'. assumption. }
+    pose proof (normal_form'_lift_plusn n r') as [Hms0' _].
+    pose proof (multi_step'_trans _ _ _ Hms' Hms0').
+    split; [|intros [x contra]; inversion contra].
+    eassumption.
+  - apply mapping_not_change_deriving. assumption.
 Qed.
-
-Lemma lifted_analysis_nf_aux: forall t1' t2',
-  has_type' empty t1' (Arrow' Nat' Nat') ->
-  step'_normal_form_of t1' t2' ->
-  exists x t'body, t2' = abs' x Nat' t'body.
-Proof.
-  intros t1' t2' Htype' [Hmulti' Hnf'].
-  assert (Htype'2: has_type' empty t2' (Arrow' Nat' Nat')).
-  { apply preservation'_multi with (t1':=t1'); assumption. }
-  assert (Hvalue': value' t2').
-  { destruct (progress' _ _ Htype'2).
-    - assumption.
-    - apply Hnf' in H as []. }
-  destruct (canonical_forms_fun' _ _ _ Htype'2 Hvalue') as [x [u' H] ].
-  exists x, u'. assumption.
-Qed.
-
-Lemma lifted_analysis_nf: forall t',
-  has_type' empty t' (Arrow' Nat' Nat') ->
-  exists x t'body, step'_normal_form_of t' (abs' x Nat' t'body).
-Proof.
-  intros t' Ht'.
-  apply analysis'_normalization' in Ht' as [v' [Hm' [x [vbody' Habs'] ] ] ].
-  exists x, vbody'.
-  split.
-  - rewrite <- Habs'. exact Hm'.
-  - intros [t1' contra]. inversion contra.
-Qed.
-
-Lemma multi_step_App1: forall t1 t2 t3,
-  multi step t1 t2 ->
-  multi step (app t1 t3) (app t2 t3).
-Proof.
-  intros t1 t2 t3 STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_App1; eauto. auto.
-Qed.
-
-Lemma app_fun_normalizes: forall t1 t2 t3 nf,
-  step_normal_form_of t1 t2 ->
-  step_normal_form_of (app t1 t3) nf ->
-  step_normal_form_of (app t2 t3) nf.
-Proof.
-  intros.
-  inversion H0; clear H0.
-  inversion H; clear H.
-  split; auto.
-  apply multi_step_App1 with (t3:=t3) in H0.
-  clear H3.
-
-  induction H0; inversion H1; subst;
-    eauto.
-  - exfalso. apply H2. exists y. auto.
-  - apply (determinism _ _ _ H) in H3. subst.
-    apply IHmulti. auto.
-Qed.
-
-Lemma app'_fun_normalizes: forall t1' t2' v' nf',
-  step'_normal_form_of t1' t2' ->
-  value' v' ->
-  step'_normal_form_of (app' t1' v') nf' ->
-  step'_normal_form_of (app' t2' v') nf'.
-Proof. Admitted.
