@@ -2,7 +2,7 @@ Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
-Require Import Enviroments.
+Require Import Environments.
 
 Hint Constructors multi : core.
 Hint Constructors value' : core.

@@ -26,7 +26,18 @@ Proof.
     destruct H as [_ [H _] ]; assumption.
 Qed.
 
-(* This proof depends on normalization *)
+(* This proof depends on normalization
+   Reasoning: Suppose we could prove LR_halts without
+   using normalization theorem.
+   Then we could alse prove completeness theorem without using
+   the normalization theorem.
+   But now we proved that every well typed term is in the relation
+   (completeness)
+   and we also proved that every term in the relation halts
+   (LR_halts)
+   This implies that ever well typed term halts
+   (normalization)
+*)
 Lemma LR_halts: forall {cfg} {T} {t} {t'},
   LR cfg T t t' -> halts t /\ halts' t'.
 Proof.
@@ -228,7 +239,7 @@ Proof.
   assumption.
 Qed.
 
-Require Import Enviroments.
+Require Import Environments.
 
 Inductive instantiation : feat_config -> tass -> env -> env' -> Prop :=
   | V_nil : forall cfg, instantiation cfg nil nil nil
@@ -343,6 +354,7 @@ Proof.
     destruct (String.eqb x x0); auto. constructor; eauto.
 Qed.
 
+(*TODO: Is there a way to prove T_Abs case without LR_halts?*)
 Lemma completeness: forall c env env' t T cfg,
   has_type (mupdate empty c)  t T ->
   instantiation cfg c env env' ->
@@ -466,7 +478,7 @@ Proof.
     + apply mapping_not_change_deriving. assumption.
 Qed.
 
-Theorem commutation: forall cfg analysis spl p r r',
+Theorem commutativity: forall cfg analysis spl p r r',
   has_type empty analysis (Arrow Nat Nat) ->
   derive spl cfg = Some p ->
   step_normal_form_of (app analysis (const p)) (const r) ->
