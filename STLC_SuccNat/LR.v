@@ -211,6 +211,20 @@ Proof.
   apply (mstep_preserves_LR _ _ _ t2) in H1; auto.
 Qed.
 
+Lemma mstep_mstep'__preserves_LR': forall T cfg t1 t2 t1' t2',
+  has_type empty t1 T ->
+  has_type' empty t1' (lift_ty T) ->
+  multi step t1 t2 ->
+  multi step' t1' t2' ->
+  LR cfg T t2 t2' -> LR cfg T t1 t1'.
+Proof.
+  intros.
+  apply (preservation'_multi _ _ _ H0) in H2 as H4.
+  apply (mstep'_preserves_LR' _ _ _ t1') in H3; auto.
+  apply (preservation_multi _ _ _ H) in H1 as H5.
+  apply (mstep_preserves_LR' _ _ t1) in H3; auto.
+Qed.  
+  
 Lemma soundness: forall cfg analysis,
   LR cfg (Arrow Nat Nat) analysis (lift analysis) ->
   (forall spl p r' r,
@@ -415,21 +429,22 @@ Proof.
       intros.
       destruct (LR_halts H0) as [ [v [P Q] ] [v' [P' Q'] ] ].
       pose proof (mstep_mstep'__preserves_LR _ _ _ _ _ _ P P' H0).
-      apply mstep_preserves_LR' with (msubst ((x,v)::env0) t).
+      apply mstep_mstep'__preserves_LR' with (msubst ((x,v)::env0) t) (msubst' ((x,v')::env0') (lift t)).
       { eapply T_App; eauto.
         eapply LR_typable_empty; eauto. }
+      { eapply T_App'; eauto.
+        eapply LR_typable_empty; eauto. }
       { eapply multi_step_trans. eapply multistep_App2; eauto.
-            eapply multi_step with (y:= (msubst ((x, v) :: env0) t)); [|apply multi_refl].
+            eapply multi_step with (y:= (msubst ((x, v) :: env0) t));
+              [|apply multi_refl].
             simpl.  rewrite subst_msubst.
             eapply ST_AppAbs; eauto.
             eapply typable_empty__closed.
             apply (LR_typable_empty H1).
             eapply instantiation_env_closed; eauto. }
-      apply mstep'_preserves_LR' with (msubst' ((x,v')::env0') (lift t)).
-      { eapply T_App'; eauto.
-        eapply LR_typable_empty; eauto. }
       { eapply multi_step'_trans. eapply multistep'_App2'; eauto.
-            eapply multi_step with (y:= (msubst' ((x, v') :: env0') (lift t))); [|apply multi_refl].
+            eapply multi_step with (y:= (msubst' ((x, v') :: env0') (lift t)));
+              [|apply multi_refl].
             simpl.  rewrite subst'_msubst'.
             eapply ST_AppAbs'; eauto.
             eapply typable_empty__closed'.
