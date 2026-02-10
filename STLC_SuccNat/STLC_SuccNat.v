@@ -3,7 +3,8 @@ Require Import Maps.
 (* Terms and Values *)
 Inductive ty : Type :=
   | Arrow : ty -> ty -> ty
-  | Nat : ty.
+  | Nat : ty
+  | List : ty -> ty.
 
 (* Notation "S -> T" := (Arrow S T). *)
 
@@ -13,11 +14,18 @@ Inductive tm : Type :=
   | abs : string -> ty -> tm -> tm
 
   | const : nat -> tm
-  | succ : tm -> tm.
+  | succ : tm -> tm
+
+  | nil : ty -> tm
+  | cons : tm -> tm -> tm.
+  (* Should we add an operation on lists?
+     I was thinking of adding map : tm -> tm -> tm *)
 
 Inductive value : tm -> Prop :=
   | v_abs : forall x T t, value (abs x T t)
-  | v_nat : forall (n : nat), value (const n).
+  | v_nat : forall (n : nat), value (const n)
+  | v_lnil : forall T, value (nil T)
+  | v_lcons : forall v1 v2, value v1 -> value v2 -> value (cons v1 v2).
 
 
 (* Evaluation *)
@@ -29,6 +37,9 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
 
   | const _ => t
   | succ t1 => succ (subst x s t1)
+
+  | nil T => nil T
+  | cons t1 t2 => cons (subst x s t1) (subst x s t2)
   end.
 
 (* Notation "[ x := s ] t" := (subst x s t) (at level 100).
@@ -36,21 +47,29 @@ Check [ "t" := const 1 ] (abs "t" Nat (succ (var "t"))). *)
 
 
 Inductive step : tm -> tm -> Prop :=
-  | ST_App1: forall t1 t1' t2,
-    step t1 t1' ->
-      step (app t1 t2) (app t1' t2)
-  | ST_App2: forall v t2 t2',
-    value v -> step t2 t2' ->
-      step (app v t2) (app v t2')
+  | ST_App1: forall t1 t2 t3,
+    step t1 t2 ->
+      step (app t1 t3) (app t2 t3)
+  | ST_App2: forall v t2 t3,
+    value v -> step t2 t3 ->
+      step (app v t2) (app v t3)
   | ST_AppAbs: forall x T t v,
     value v ->
       step (app (abs x T t) v) (subst x v t)
 
-  | ST_Succ: forall t1 t1',
-    step t1 t1' ->
-      step (succ t1) (succ t1')
+  | ST_Succ: forall t1 t2,
+    step t1 t2 ->
+      step (succ t1) (succ t2)
   | ST_SuccConst : forall (n : nat),
-    step (succ (const n)) (const (S n)).
+    step (succ (const n)) (const (S n))
+
+  | ST_Cons1: forall t1 t2 t3,
+    step t1 t2 ->
+    step (cons t1 t3) (cons t2 t3)
+  | ST_Cons2: forall v t2 t3,
+    value v ->
+    step t2 t3 ->
+    step (cons v t2) (cons v t3).
 
 Inductive multi {X : Type} (R : X -> X -> Prop) : X -> X -> Prop :=
   | multi_refl : forall (x : X), multi R x x
@@ -63,8 +82,8 @@ Definition normal_form {X : Type}
               (R : X -> X -> Prop) (t : X) : Prop :=
   ~(exists t', R t t').
 
-Definition step_normal_form_of t t':=
-  (multi step t t' /\ normal_form step t').
+Definition step_normal_form_of t1 t2:=
+  (multi step t1 t2 /\ normal_form step t2).
 
 (*Typing*)
 Definition context := partial_map ty.
@@ -84,18 +103,25 @@ Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Nat : forall Gamma (n : nat),
     has_type Gamma (const n) Nat
   | T_Succ : forall Gamma t,
-    has_type Gamma t Nat -> has_type Gamma (succ t) Nat.
+    has_type Gamma t Nat -> has_type Gamma (succ t) Nat
+
+  | T_Nil : forall Gamma T,
+    has_type Gamma (nil T) (List T)
+  | T_Cons : forall Gamma t1 t2 T,
+    has_type Gamma t1 T ->
+    has_type Gamma t2 (List T) ->
+      has_type Gamma (cons t1 t2) (List T).
 
 
 (* Properties *)
-Lemma weakening : forall Gamma Gamma' t T,
-  includedin Gamma Gamma' ->
-  has_type Gamma t T ->
-  has_type Gamma' t T.
+Lemma weakening : forall Gamma1 Gamma2 t T,
+  includedin Gamma1 Gamma2 ->
+  has_type Gamma1 t T ->
+  has_type Gamma2 t T.
 Proof.
-  intros Gamma Gamma' t T H Ht.
-  generalize dependent Gamma'.
-  induction Ht; intros Gamma' Hi;
+  intros Gamma1 Gamma2 t T H Ht.
+  generalize dependent Gamma2.
+  induction Ht; intros Gamma2 Hi;
     econstructor; eauto using includedin_update.
 Qed.
 
@@ -125,8 +151,27 @@ Lemma canonical_forms_fun : forall t T1 T2,
   exists x u, t = abs x T1 u.
 Proof.
   intros t T1 T2 HT HVal.
-  destruct HVal as [x ? t1| ] ; inversion HT; subst.
+  destruct HVal as [x ? t1| | |] ; inversion HT; subst.
   exists x, t1. reflexivity.
+Qed.
+
+(*TODO: Is this right*)
+Lemma canonical_forms_list : forall t T,
+  has_type empty t (List T) ->
+  value t ->
+    t = (nil T) \/ 
+    exists v2,
+      has_type empty v2 (List T) ->
+      value v2 ->
+        (exists v1 , value v1 -> t = (cons v1 v2)).
+Proof.
+  intros t T HT Hv.
+  destruct Hv; inversion HT; subst.
+  - left; auto.
+  - right. exists v2.
+    intros _ _.
+    exists v1. intros _.
+    f_equal.
 Qed.
 
 Ltac unfold_exists :=
@@ -140,17 +185,27 @@ Theorem progress : forall t T,
 Proof.
   intros t T Ht.
   remember empty as Gamma.
-  induction Ht; subst Gamma;
-    try (left; constructor).
+  induction Ht; subst Gamma.
+    (*try (left; constructor).*)
   - inversion H.
+  - left; constructor.
   - right. destruct IHHt1;
     destruct IHHt2; unfold_exists; eauto using ST_App1, ST_App2.
     + eapply canonical_forms_fun in Ht1 as [x [u Ht1]]; subst;
       eauto; eexists; econstructor; assumption.
+  - left; constructor.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat in H as [n H]; subst; eauto.
       eexists. apply ST_SuccConst.
     + destruct H; eexists; eapply ST_Succ; eauto.
+  - left; constructor.
+  - destruct IHHt1; auto.
+    + destruct IHHt2; auto.
+      * left. constructor; auto.
+      * right. unfold_exists.
+        eexists; eauto using ST_Cons2.
+    + right. unfold_exists.
+      eexists; eauto using ST_Cons1.
 Qed.
 
 Lemma value_is_nf: forall t,
@@ -159,8 +214,12 @@ Proof.
   intros t Hv.
   induction t; split;
     try inversion Hv; subst;
-    try (intros [t' Hc]; inversion Hc);
-    try constructor.
+    try (intros [t1 Hc]; inversion Hc);
+    try constructor; subst.
+  - apply IHt1 in H1 as [_ H1].
+    apply IHt2 in H2 as [_ H2].
+    intros H. destruct H as [x H].
+    inversion H; subst; eauto.
 Qed.
 
 Ltac value_no_step :=
@@ -182,7 +241,7 @@ Theorem determinism : forall t1 t2 t3,
 Proof.
   intros t1 t2 t3 Ht.
   generalize dependent t3.
-  induction Ht; intros t3 Ht';
+  induction Ht; intros t4 Ht';
     inversion Ht'; subst; eauto;
     try value_no_step;
     try (f_equal; eauto);
@@ -209,10 +268,10 @@ Proof.
       rewrite n in H5. assumption.
 Qed.
 
-Theorem preservation: forall t t' T,
-  has_type empty t T ->
-  step t t' ->
-  has_type empty t' T.
+Theorem preservation: forall t1 t2 T,
+  has_type empty t1 T ->
+  step t1 t2 ->
+  has_type empty t2 T.
 Proof.
   intros t t' T Ht;
   generalize dependent t'.
@@ -226,10 +285,10 @@ Proof.
     eassumption.
 Qed.
 
-Lemma preservation_multi: forall t t' T,
-  has_type empty t T ->
-  multi step t t' ->
-  has_type empty t' T.
+Lemma preservation_multi: forall t1 t2 T,
+  has_type empty t1 T ->
+  multi step t1 t2 ->
+  has_type empty t2 T.
 Proof.
   intros t t' T Htype Hmulti.
   induction Hmulti.
@@ -238,10 +297,10 @@ Proof.
     apply IHHmulti. apply H.
 Qed.
 
-Theorem normal_forms_unique: forall t1 t2 t2',
+Theorem normal_forms_unique: forall t1 t2 t3,
   step_normal_form_of t1 t2 ->
-  step_normal_form_of t1 t2' ->
-  t2 = t2'.
+  step_normal_form_of t1 t3 ->
+  t2 = t3.
 Proof.
   intros t1 t2 t2' P1 P2.
   destruct P1 as [P11 P12].
@@ -284,8 +343,8 @@ Proof.
     + exact H23.
 Qed.
 
-Lemma multistep_App2 : forall v t t',
-  value v -> (multi step t t') -> multi step (app v t) (app v t').
+Lemma multistep_App2 : forall v t1 t2,
+  value v -> (multi step t1 t2) -> multi step (app v t1) (app v t2).
 Proof.
   intros v t t' V STM. induction STM.
    apply multi_refl.
@@ -293,8 +352,8 @@ Proof.
      apply ST_App2; eauto.  auto.
 Qed.
 
-Lemma multistep_succ : forall t t',
-  multi step t t' -> multi step (succ t) (succ t').
+Lemma multistep_succ : forall t1 t2,
+  multi step t1 t2 -> multi step (succ t1) (succ t2).
 Proof.
   intros t t' STM. induction STM.
    apply multi_refl.

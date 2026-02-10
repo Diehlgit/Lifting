@@ -6,12 +6,14 @@ Require Import Presence_Conditions.
 (* Automatic lifting *)
 Inductive ty' : Type :=
   | Arrow' : ty' -> ty' -> ty'
-  | Nat' : ty'.
+  | Nat' : ty'
+  | List' : ty' -> ty'.
 
 Fixpoint lift_ty (T : ty) : ty' :=
   match T with
     | Nat => Nat'
     | Arrow T1 T2 => Arrow' (lift_ty T1) (lift_ty T2)
+    | List T => List' (lift_ty T)
   end.
 
 Definition nat' := variational_value nat.
@@ -22,7 +24,10 @@ Inductive tm' :=
   | app' : tm' -> tm' -> tm'
 
   | const' : nat' -> tm'
-  | succ' : tm' -> tm'.
+  | succ' : tm' -> tm'
+
+  | nil' : ty' -> tm'
+  | cons' : tm' -> tm' -> tm'.
 
 Fixpoint lift (t:tm) : tm':=
   match t with
@@ -32,41 +37,59 @@ Fixpoint lift (t:tm) : tm':=
 
   | const n => (const' [(n, pc_True)])
   | succ t => (succ' (lift t))
+
+  | nil T => (nil' (lift_ty T))
+  | cons t1 t2 => cons' (lift t1) (lift t2)
   end.
 
 Inductive value' : tm' -> Prop :=
   | v_abs' : forall x T' t', value' (abs' x T' t')
-  | v_nat' : forall n', value' (const' n').
+  | v_nat' : forall n', value' (const' n')
+  | v_lnil' : forall T', value' (nil' T')
+  | v_lcons' : forall v1' v2', value' v1' -> value' v2' -> value' (cons' v1' v2').
 
 Fixpoint subst' (x:string) (s' t': tm'): tm' :=
   match t' with
   | var' y => if String.eqb x y then s' else t'
   | abs' y T' t1' => if String.eqb x y then t' else abs' y T' (subst' x s' t1')
   | app' t1' t2' => app' (subst' x s' t1') (subst' x s' t2')
+
   | const' _ => t'
   | succ' t1' => succ' (subst' x s' t1')
+
+  | nil' T' => nil' T'
+  | cons' t1' t2' => cons' (subst' x s' t1') (subst' x s' t2')
   end.
 
 Inductive step': tm' -> tm' -> Prop :=
-  | ST_App1': forall t1' t1'' t2',
-    step' t1' t1'' ->
-      step' (app' t1' t2') (app' t1'' t2')
-  | ST_App2': forall v' t2' t2'',
+  | ST_App1': forall t1' t2' t3',
+    step' t1' t2' ->
+      step' (app' t1' t3') (app' t2' t3')
+  | ST_App2': forall v' t1' t2',
     value' v' ->
-    step' t2' t2'' ->
-      step' (app' v' t2') (app' v' t2'')
+    step' t1' t2' ->
+      step' (app' v' t1') (app' v' t2')
   | ST_AppAbs': forall x T' t' v',
     value' v' ->
       step' (app' (abs' x T' t') v') (subst' x v' t')
-  | ST_Succ': forall t' t'',
-    step' t' t'' ->
-      step' (succ' t') (succ' t'')
+
+  | ST_Succ': forall t1' t2',
+    step' t1' t2' ->
+      step' (succ' t1') (succ' t2')
   | ST_SuccConst': forall n',
       step' (succ' (const' n'))
-      (const' (map (fun '(n,pc) => ((S n), pc)) n')).
+      (const' (map (fun '(n,pc) => ((S n), pc)) n'))
 
-Definition step'_normal_form_of t' t'':=
-  (multi step' t' t'' /\ normal_form step' t'').
+  | ST_Cons1': forall t1' t2' t3',
+    step' t1' t2' ->
+    step' (cons' t1' t3') (cons' t2' t3')
+  | ST_Cons2': forall v1' t2' t3',
+    value' v1' ->
+    step' t2' t3' ->
+    step' (cons' v1' t2') (cons' v1' t3').
+
+Definition step'_normal_form_of t1' t2':=
+  (multi step' t1' t2' /\ normal_form step' t2').
 
 (* Typing *)
 Definition context' := partial_map ty'.
@@ -90,7 +113,14 @@ Inductive has_type': context' -> tm' -> ty' -> Prop :=
     has_type' Gamma' (const' n') Nat'
   | T_Succ' : forall Gamma' t',
     has_type' Gamma' t' Nat' ->
-      has_type' Gamma' (succ' t') Nat'.
+      has_type' Gamma' (succ' t') Nat'
+
+  | T_Nil' : forall Gamma' T',
+    has_type' Gamma' (nil' T') (List' T')
+  | T_Cons' : forall Gamma' t1' t2' T',
+    has_type' Gamma' t1' T' ->
+    has_type' Gamma' t2' (List' T') ->
+      has_type' Gamma' (cons' t1' t2') (List' T').
 
 (* Typing Theorems *)
 Lemma weakening': forall Gamma1' Gamma2' t' T',
@@ -130,7 +160,7 @@ Lemma canonical_forms_fun' : forall t' T1' T2',
   exists x u', t' = abs' x T1' u'.
 Proof.
   intros t' T1' T2' HT HVal.
-  destruct HVal as [x ? t1'| ] ; inversion HT; subst.
+  destruct HVal as [x ? t1'| | |] ; inversion HT; subst.
   exists x, t1'. reflexivity.
 Qed.
 
@@ -140,17 +170,27 @@ Theorem progress' : forall t1' T',
 Proof.
   intros t' T' Ht.
   remember empty as Gamma'.
-  induction Ht; subst Gamma';
-    try (left; constructor).
+  induction Ht; subst Gamma'.
+    (*try (left; constructor).*)
   - inversion H.
+  - left; constructor.
   - right. destruct IHHt1;
     destruct IHHt2; unfold_exists; eauto using ST_App1', ST_App2'.
     eapply canonical_forms_fun' in Ht1 as [x [u' Ht1'] ]; subst;
       eauto; eexists; econstructor; assumption.
+  - left; constructor.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat' in H as [n' H]; subst; eauto.
       eexists. apply ST_SuccConst'.
     + destruct H; eexists; eapply ST_Succ'; eauto.
+  - left; constructor.
+  - destruct IHHt1; auto.
+    + destruct IHHt2; auto.
+      * left. constructor; auto.
+      * right. unfold_exists.
+        eexists; eauto using ST_Cons2'.
+    + right. unfold_exists.
+      eexists; eauto using ST_Cons1'.
 Qed.
 
 Lemma substitution_preserves_typing': forall Gamma' x U' t' v' T',
@@ -252,7 +292,9 @@ Proof.
   split;
     try inversion Hv; subst;
     try (intros [t1' Hc]; inversion Hc);
-    try constructor.
+    try constructor; subst.
+  - apply IHt'1 in H1 as [_ H1]; eauto.
+  - apply IHt'2 in H2 as [_ H2]; eauto.
 Qed.
 
 Ltac value'_no_step :=
@@ -266,7 +308,7 @@ Theorem determinism' : forall t1' t2' t3',
 Proof.
   intros t1' t2' t3' Ht.
   generalize dependent t3'.
-  induction Ht; intros t3' Ht';
+  induction Ht; intros t4' Ht';
     inversion Ht'; subst; eauto;
     try value'_no_step;
     try (f_equal; eauto);
@@ -335,6 +377,12 @@ Proof.
   - (* T_Succ' *)
     apply T_Succ'.
     apply IHH_type. exact H_equiv.
+  - (* T_Nil' *)
+    apply T_Nil'.
+  - (* T_Cons' *)
+    eapply T_Cons'.
+    + apply IHH_type1. exact H_equiv.
+    + apply IHH_type2. exact H_equiv.
 Qed.
 
 Lemma lift_context_update : forall (Gamma : partial_map ty) x T y,
@@ -382,17 +430,28 @@ Proof.
   induction body;
     try (rename t into T);
     intros x t; simpl.
-  - destruct (eqb_spec x s);
+  - (* Var *)
+    destruct (eqb_spec x s);
     reflexivity.
-  - rewrite IHbody1.
+  - (* App *)
+    rewrite IHbody1.
     rewrite IHbody2.
     reflexivity.
-  - destruct (eqb_spec x s).
+  - (* Abs *)
+    destruct (eqb_spec x s).
     + reflexivity.
     + simpl. rewrite IHbody.
       reflexivity.
-  - reflexivity.
-  - rewrite IHbody.
+  - (* Const *)
+    reflexivity.
+  - (* Succ *)
+    rewrite IHbody.
+    reflexivity.
+  - (* Nil *)
+    reflexivity.
+  - (* Cons *)
+    rewrite IHbody1.
+    rewrite IHbody2.
     reflexivity.
 Qed.
 
@@ -401,7 +460,8 @@ Lemma value_value': forall v,
 Proof.
   induction v; intros Hv;
     try solve_by_inverts 2;
-    constructor.
+    constructor;
+    try inversion Hv; auto.
 Qed.
 
 Lemma step_step': forall t1 t2,
@@ -425,6 +485,13 @@ Proof.
     + apply IHt1 in H0.
       apply ST_Succ'; assumption.
     + apply ST_SuccConst'.
+  - inversion Hstep; subst.
+    + apply IHt1_1 in H2.
+      apply ST_Cons1'. assumption.
+    + apply IHt1_2 in H3.
+      apply ST_Cons2';
+        try (apply value_value' in H1);
+        assumption.
 Qed.
 
 Lemma mstep_mstep': forall t1 t2,
