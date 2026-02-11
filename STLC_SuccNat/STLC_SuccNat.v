@@ -4,7 +4,7 @@ Require Import Maps.
 Inductive ty : Type :=
   | Arrow : ty -> ty -> ty
   | Nat : ty
-  | List : ty -> ty.
+  | NatList : ty.
 
 (* Notation "S -> T" := (Arrow S T). *)
 
@@ -16,15 +16,15 @@ Inductive tm : Type :=
   | const : nat -> tm
   | succ : tm -> tm
 
-  | nil : ty -> tm
-  | cons : tm -> tm -> tm.
-  (* Should we add an operation on lists?
-     I was thinking of adding map : tm -> tm -> tm *)
+  | nil :  tm
+  | cons : tm -> tm -> tm
+  | case : tm -> tm -> string -> string -> tm -> tm.
+  (* i.e., case t1 of | nil ⇒ t2 | x::y ⇒ t3 *)
 
 Inductive value : tm -> Prop :=
   | v_abs : forall x T t, value (abs x T t)
   | v_nat : forall (n : nat), value (const n)
-  | v_lnil : forall T, value (nil T)
+  | v_lnil : value nil
   | v_lcons : forall v1 v2, value v1 -> value v2 -> value (cons v1 v2).
 
 
@@ -38,8 +38,10 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
   | const _ => t
   | succ t1 => succ (subst x s t1)
 
-  | nil T => nil T
+  | nil => nil
   | cons t1 t2 => cons (subst x s t1) (subst x s t2)
+  | case t1 t2 y z t3 => case (subst x s t1) (subst x s t2) y z
+                              (if (orb (eqb x y) (eqb x z)) then t3 else (subst x s t3))
   end.
 
 (* Notation "[ x := s ] t" := (subst x s t) (at level 100).
@@ -69,7 +71,16 @@ Inductive step : tm -> tm -> Prop :=
   | ST_Cons2: forall v t2 t3,
     value v ->
     step t2 t3 ->
-    step (cons v t2) (cons v t3).
+    step (cons v t2) (cons v t3)
+  | ST_Case1: forall x y t1 t2 tnil tcons,
+    step t1 t2 ->
+    step (case t1 tnil x y tcons) (case t2 tnil x y tcons)
+  | ST_CaseNil: forall x y tnil tcons,
+    step (case nil tnil x y tcons) tnil
+  | ST_CaseCons: forall x y vh vt tnil tcons,
+    value vh ->
+    value vt ->
+    step (case (cons vh vt) tnil x y tcons) (subst y vt (subst x vh tcons)).
 
 Inductive multi {X : Type} (R : X -> X -> Prop) : X -> X -> Prop :=
   | multi_refl : forall (x : X), multi R x x
@@ -105,12 +116,17 @@ Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Succ : forall Gamma t,
     has_type Gamma t Nat -> has_type Gamma (succ t) Nat
 
-  | T_Nil : forall Gamma T,
-    has_type Gamma (nil T) (List T)
-  | T_Cons : forall Gamma t1 t2 T,
-    has_type Gamma t1 T ->
-    has_type Gamma t2 (List T) ->
-      has_type Gamma (cons t1 t2) (List T).
+  | T_Nil : forall Gamma,
+    has_type Gamma nil NatList
+  | T_Cons : forall Gamma t1 t2,
+    has_type Gamma t1 Nat ->
+    has_type Gamma t2 NatList ->
+      has_type Gamma (cons t1 t2) NatList
+  | T_Case : forall Gamma x y T t1 tnil tcons,
+    has_type Gamma t1 NatList ->
+    has_type Gamma tnil T ->
+    has_type (x |-> Nat; y |-> NatList; Gamma) tcons T ->
+    has_type Gamma (case t1 tnil x y tcons) T.
 
 
 (* Properties *)
@@ -155,29 +171,33 @@ Proof.
   exists x, t1. reflexivity.
 Qed.
 
-(*TODO: Is this right*)
-Lemma canonical_forms_list : forall t T,
-  has_type empty t (List T) ->
+(*TODO: Is this right?*)
+Lemma canonical_forms_list : forall t,
+  has_type empty t NatList ->
   value t ->
-    t = (nil T) \/ 
-    exists v2,
-      has_type empty v2 (List T) ->
-      value v2 ->
-        (exists v1 , value v1 -> t = (cons v1 v2)).
+    t = nil \/
+    (exists v1 v2,
+      value v1 /\ value v2 /\ t = (cons v1 v2)).
 Proof.
-  intros t T HT Hv.
-  destruct Hv; inversion HT; subst.
-  - left; auto.
-  - right. exists v2.
-    intros _ _.
-    exists v1. intros _.
-    f_equal.
+  intros t HT Hv.
+  destruct Hv; inversion HT; subst; eauto 7.
+(*- auto.
+  - right. exists v1, v2.
+    split; [auto|split;auto]. *)
 Qed.
 
 Ltac unfold_exists :=
   repeat try match goal with
       | [ H: exists _, _ |- _ ] => destruct H
   end.
+
+Ltac solve_by_inverts n :=
+	match goal with | H : ?T  |-  _  =>
+	match type of T with Prop =>
+		solve [ inversion H;
+		match n with S (S (?n')) =>
+			subst; solve_by_inverts (S n') end ]
+	end end.
 
 Theorem progress : forall t T,
     has_type empty t T ->
@@ -206,6 +226,14 @@ Proof.
         eexists; eauto using ST_Cons2.
     + right. unfold_exists.
       eexists; eauto using ST_Cons1.
+  - destruct IHHt1; auto; right.
+    + destruct t1;
+        try solve_by_inverts 1; eexists.
+        * apply ST_CaseNil.
+        * inversion H; subst.
+          eapply ST_CaseCons; auto.
+    + unfold_exists. eexists.
+      constructor. eauto.
 Qed.
 
 Lemma value_is_nf: forall t,
@@ -226,15 +254,11 @@ Ltac value_no_step :=
 	match goal with
 	| [ H1: value ?t, H2: step ?t  _ |- _ ] =>
 		exfalso; apply value_is_nf in H1 as [_ H1]; eauto
-	end.
-
-Ltac solve_by_inverts n :=
-	match goal with | H : ?T  |-  _  =>
-	match type of T with Prop =>
-		solve [ inversion H;
-		match n with S (S (?n')) =>
-			subst; solve_by_inverts (S n') end ]
-	end end.
+  | [ H1: value ?t1, H2: value ?t2, H3: step (cons ?t1 ?t2) _ |- _] =>
+    inversion H3; subst; exfalso;
+             apply value_is_nf in H1 as [_ H1];
+             apply value_is_nf in H2 as [_ H2]; eauto
+  end.
 
 Theorem determinism : forall t1 t2 t3,
   step t1 t2 -> step t1 t3 -> t2 = t3.
@@ -245,7 +269,7 @@ Proof.
     inversion Ht'; subst; eauto;
     try value_no_step;
     try (f_equal; eauto);
-    solve_by_inverts 1.
+    try solve_by_inverts 2.
 Qed.
 
 Lemma substitution_preserves_typing : forall Gamma x U t v T,
@@ -258,7 +282,7 @@ Proof.
   induction t; intros T Gamma H;
     inversion H; clear H; subst; simpl; eauto;
     try (econstructor; eauto);
-    destruct (eqb_spec x s); subst; try (constructor).
+    destruct (eqb_spec x s); subst; simpl; try (constructor).
     + rewrite update_eq in H2.
       injection H2 as H2; subst.
       apply weakening_empty. assumption.
@@ -266,6 +290,20 @@ Proof.
     + rewrite update_shadow in H5. assumption.
     + apply IHt. eapply update_permute in n.
       rewrite n in H5. assumption.
+    + destruct (eqb_spec s s0); subst.
+      * repeat rewrite update_shadow in H9.
+        rewrite update_shadow. assumption.
+      * rewrite update_permute in H9; auto.
+        rewrite update_shadow in H9.
+        rewrite update_permute; auto.
+    + destruct (eqb_spec x s0); subst.
+      * rewrite update_shadow in H9. assumption.
+      * apply IHt3. assert (
+          (x) |-> U; (s) |-> Nat; (s0) |-> NatList; Gamma =
+          (s) |-> Nat; (s0) |-> NatList; (x) |-> U; Gamma).
+        { rewrite update_permute; auto. f_equal.
+          rewrite update_permute; auto. }
+        rewrite H. assumption.
 Qed.
 
 Theorem preservation: forall t1 t2 T,
@@ -280,9 +318,12 @@ Proof.
     inversion H0; subst;
       try (econstructor; eauto).
   apply (T_App _ _ _ _ _ Ht1) in Ht2.
-  eapply substitution_preserves_typing;
+  - eapply substitution_preserves_typing;
     inversion Ht2; inversion H4; subst;
     eassumption.
+  - assumption.
+  - inversion Ht1; subst.
+    repeat eapply substitution_preserves_typing; eauto.
 Qed.
 
 Lemma preservation_multi: forall t1 t2 T,
