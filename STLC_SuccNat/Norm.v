@@ -31,7 +31,20 @@ Inductive appears_free_in : string -> tm -> Prop :=
     y <> x -> appears_free_in x t12 ->
       appears_free_in x (abs y T11 t12)
   (* nats*)
-  |afi_succ : forall x t1, appears_free_in x t1 -> appears_free_in x (succ t1).
+  |afi_succ : forall x t1, appears_free_in x t1 -> appears_free_in x (succ t1)
+  (* lists *)
+  |afi_cons1 : forall x t1 t2, appears_free_in x t1 -> appears_free_in x (cons t1 t2)
+  |afi_cons2 : forall x t1 t2, appears_free_in x t2 -> appears_free_in x (cons t1 t2)
+  
+  |afi_case1 : forall x y z t1 tnil tcons,
+    appears_free_in x t1 -> appears_free_in x (case t1 tnil y z tcons)
+  |afi_case2 : forall x y z t1 tnil tcons,
+    appears_free_in x tnil -> appears_free_in x (case t1 tnil y z tcons)
+  |afi_case3 : forall x y z t1 tnil tcons,
+    y <> x ->
+    z <> x ->
+    appears_free_in x tcons ->
+      appears_free_in x (case t1 tnil y z tcons).
 
 Hint Constructors appears_free_in : core.
 
@@ -59,6 +72,20 @@ Proof.
     + rewrite update_neq; [| assumption].
       rewrite update_neq; [| assumption].
       auto.
+  - (* T_Case *)
+    apply T_Case;
+      [ apply IHhas_type1 |
+        apply IHhas_type2 |
+        apply IHhas_type3 ];
+      intros x1 Hafi;
+      try apply H2; auto.
+    destruct (eqb_spec x x1);
+    destruct (eqb_spec y x1); subst.
+    + repeat rewrite update_eq. auto.
+    + repeat rewrite update_eq. auto.
+    + repeat (rewrite update_neq; auto;
+      rewrite update_eq).
+    + repeat (rewrite update_neq; auto).
 Qed.
 
 Ltac false_eqb_string :=
@@ -67,6 +94,7 @@ Ltac false_eqb_string :=
       | [ H: ?x <> ?y |- _ ] => apply eqb_neq in H; rewrite H in *
   end.
 
+(*TODO: Maybe shorten this proof? *)
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
    has_type Gamma t T ->
@@ -78,6 +106,10 @@ Proof with eauto.
     destruct IHHtyp as [T' Hctx]... exists T'.
     unfold update, t_update in Hctx.
     false_eqb_string...
+  - (* T_Case *)
+    destruct IHHtyp3 as [T' Hctx]... exists T'.
+    unfold update, t_update in Hctx.
+    repeat false_eqb_string...
 Qed.
 
 Corollary typable_empty__closed : forall t T,
@@ -93,6 +125,7 @@ Fixpoint R (T:ty) (t:tm) : Prop :=
   (match T with
     | Nat => True
     | Arrow T1 T2 => (forall s, R T1 s -> R T2 (app t s))
+    | NatList => True
     end).
 
 (* Proving that the relation has the wanted property *)
@@ -126,6 +159,7 @@ Proof.
   apply multi_step with (y:= t'); auto.
 Qed.
 
+(*TODO: Maybe shorten this proof? *)
 Lemma step_preserves_R : forall T t t', (step t t') -> R T t -> R T t'.
 Proof.
  induction T;  intros t t' E Rt; unfold R; fold R; unfold R in Rt; fold R in Rt;
@@ -141,6 +175,10 @@ Proof.
   split. eapply preservation; eauto.
   split. apply (step_preserves_halting _ _ E); eauto.
   auto.
+  (* NatList *)
+  split. eapply preservation; eauto.
+  split. apply (step_preserves_halting _ _ E); eauto.
+  auto.
 Qed.
 
 Lemma multistep_preserves_R : forall T t t',
@@ -151,6 +189,7 @@ Proof.
   apply IHSTM. eapply step_preserves_R. apply H. assumption.
 Qed.
 
+(*TODO: Maybe shorten this proof? *)
 Lemma step_preserves_R' : forall T t t',
   has_type empty t T -> (step t t') -> R T t' -> R T t.
 Proof.
@@ -166,6 +205,10 @@ Proof.
   eapply ST_App1. apply E.
   apply RRt; auto.
   (* Nat *)
+  split. auto.
+  split. apply (step_preserves_halting _ _ E); eauto.
+  auto.
+  (* NatList *)
   split. auto.
   split. apply (step_preserves_halting _ _ E); eauto.
   auto.
@@ -204,6 +247,13 @@ Proof with eauto.
     apply afi_abs...
   - (* Succ *)
     rewrite IHt...
+  - (* Cons *)
+    rewrite IHt1, IHt2...
+  - (* Case *)
+    rewrite IHt1, IHt2...
+    destruct (eqb_spec x s); simpl...
+    destruct (eqb_spec x s0); simpl...
+    rewrite IHt3...
 Qed.
 
 Lemma subst_closed: forall t,
@@ -221,7 +271,7 @@ Qed.
 
 Fixpoint closed_env (env:env) :=
   match env with
-  | nil => True
+  | [] => True
   | (x,t)::env' => closed t /\ closed_env env'
   end.
 
@@ -243,6 +293,14 @@ Proof with eauto.  (* rather slow this way *)
      inversion A.
     - (* succ *)
      inversion A; subst...
+    - (* nil *)
+     inversion A; subst...
+    - (* cons *)
+     inversion A; subst...
+    - (* case *)
+     destruct (eqb_spec x s);
+     destruct (eqb_spec x s0);
+     eauto; inversion A; subst...
 Qed.
 
 Lemma duplicate_subst : forall t' x t v,
@@ -276,6 +334,19 @@ Proof with eauto.
    reflexivity.
   - (* succ *)
    rewrite IHt...
+  - (* nil *)
+   reflexivity.
+  - (* cons *)
+   rewrite IHt1, IHt2...
+  - (* case *)
+   destruct (eqb_spec x1 s); simpl;
+   destruct (eqb_spec x s);
+   simpl; subst;
+     try rewrite IHt1, IHt2...
+   + destruct (eqb_spec x1 s0);
+     destruct (eqb_spec x s0);
+     subst;
+     try rewrite IHt1, IHt2, IHt3...
 Qed.
 
 Lemma subst_msubst: forall env x v t, closed v -> closed_env env ->
@@ -290,7 +361,7 @@ Proof.
 Qed.
 
 Inductive instantiation : tass -> env -> Prop :=
-  | V_nil : instantiation nil nil
+  | V_nil : instantiation [] []
   | V_cons : forall x T v c e,
       value v -> R T v ->
       instantiation c e ->
@@ -443,14 +514,114 @@ Proof.
       apply (canonical_forms_nat v A) in Hv as [n Hv].
       rewrite Hv. exists (const (S n)); eauto.
       auto.
+  - (* T_Nil *)
+    rewrite msubst_nil.
+    split. auto. split. apply value_halts; auto. auto.
+  - (* T_Cons *)
+    rewrite msubst_cons.
+    pose proof (IHHT1 c H env0 V) as P1.
+    pose proof (IHHT2 c H env0 V) as P2.
+    split. apply T_Cons.
+    destruct P1 as [HT _]. auto.
+    destruct P2 as [HT _]. auto.
+    split; auto.
+    destruct P1 as [_ [[v1 [Hms1 Hv1]] _]].
+    destruct P2 as [_ [[v2 [Hms2 Hv2]] _]].
+    exists (cons v1 v2); split; auto.
+    pose proof (multistep_cons1 _ _ (msubst env0 t2) Hms1).
+    pose proof (multistep_cons2 _ _ _ Hv1 Hms2).
+    apply (multi_step_trans _ _ _ H0 H1).
+  - (* T_Case *)
+    rewrite msubst_case.
+    pose proof (IHHT1 c H env0 V) as P1.
+    pose proof (IHHT2 c H env0 V) as P2.
+    clear IHHT1 IHHT2.
+    assert (WT: has_type empty (case (msubst env0 t1) (msubst env0 tnil) x y
+                  (msubst (drop y (drop x env0)) tcons)) T).
+      { eapply T_Case;
+          try (apply R_typable_empty; auto).
+          eapply msubst_preserves_typing.
+          { eapply instantiation_drop; eapply instantiation_drop; eauto. }
+          eapply context_invariance.
+          { apply HT3. }
+          intros.
+          unfold update, t_update. repeat rewrite mupdate_drop.
+          destruct (eqb_spec x x0); destruct (eqb_spec y x0);
+          try auto.
+            rewrite H.
+            clear - c n n0. induction c.
+            simpl. repeat false_eqb_string; auto.
+            simpl. destruct a.  unfold update, t_update.
+            destruct (String.eqb s x0); auto. }
+    destruct (R_halts P1) as [v1 [Hm Hv]].
+    apply R_typable_empty in P1 as H1, P2 as H2.
+    eapply multistep_preserves_R'.
+      eapply T_Case; try assumption.
+      + inversion WT; subst. assumption.
+      + eapply multistep_case1. exact Hm.
+      + pose proof (canonical_forms_list v1).
+        destruct H0.
+        eapply preservation_multi;
+          [ exact H1 |
+            exact Hm ].
+        exact Hv.
+        * (* case nil *)
+          clear - P2 Hm WT H0.
+          pose proof (R_halts P2) as [v [H1 H2]].
+          subst. eapply multistep_preserves_R'.
+          eapply preservation_multi.
+          exact WT. apply multistep_case1. exact Hm.
+          eapply multi_step. apply ST_CaseNil.
+          exact H1.
+          eapply multistep_preserves_R.
+          exact H1. exact P2.
+        * (* case cons *)
+          clear - V P1 H H1 IHHT3 Hm WT H0.
+          destruct H0 as [v2 [v3 [Hv2 [Hv3 Heq]]]].
+          subst. eapply multistep_preserves_R'.
+          eapply preservation_multi.
+          exact WT. apply multistep_case1. exact Hm.
+          eapply multi_step. apply ST_CaseCons; auto.
+          apply multi_refl.
+          assert ((subst x v2 (msubst (drop y (drop x env0)) tcons)) =
+                   msubst (drop y env0) (subst x v2 tcons)).
+          { rewrite subst_msubst. rewrite drop_comm. reflexivity.
+            pose proof (R_typable_empty P1).
+            pose proof (preservation_multi _ _ _ H0 Hm).
+            eapply typable_empty__closed.
+            inversion H2; eauto.
+            eapply instantiation_env_closed with (drop y c).
+            apply instantiation_drop. assumption. }
+          assert ((subst y v3 (msubst (drop y env0) (subst x v2 tcons))) =
+                  msubst env0 (subst y v3 (subst x v2 tcons))).
+          { rewrite <- subst_msubst. reflexivity.
+            pose proof (R_typable_empty P1).
+            pose proof (preservation_multi _ _ _ H1 Hm).
+            eapply typable_empty__closed.
+            inversion H3; eauto.
+            eapply instantiation_env_closed. exact V. }
+         rewrite H0, H2. clear P1 WT H0 H2.
+         repeat rewrite msubst_subst.
+         apply IHHT3 with ((x,Nat)::(y,NatList)::c).
+         { intros s. unfold update, t_update, lookup.
+           destruct (eqb_spec x s); auto.
+           destruct (eqb_spec y s); auto. }
+         { constructor; auto. split.
+              eapply preservation_multi in Hm; eauto.
+              inversion Hm; eauto.
+              split; auto using value_halts.
+              constructor; auto. split.
+              eapply preservation_multi in Hm; eauto.
+              inversion Hm; eauto.
+              split; auto using value_halts. }
 Qed.
 
 Theorem normalization : forall t T, has_type empty t T -> halts t.
 Proof.
   intros.
-  replace t with (msubst nil t) by reflexivity.
+  replace t with (msubst [] t) by reflexivity.
   apply (@R_halts T).
-  apply (msubst_R nil); eauto.
+  apply (msubst_R []); eauto.
   eapply V_nil.
 Qed.
 

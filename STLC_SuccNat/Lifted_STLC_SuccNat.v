@@ -617,3 +617,23 @@ Proof.
    eapply multi_step.
      apply ST_Succ'; eauto.  auto.
 Qed.
+
+Lemma multistep'_cons1' : forall t1' t2' t3',
+  multi step' t1' t2' -> multi step' (cons' t1' t3') (cons' t2' t3').
+Proof.
+  intros t1' t2' t3' Hms. induction Hms.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_Cons1'; eauto. auto.
+Qed.
+
+Lemma multistep'_cons2' : forall v1' t2' t3',
+  value' v1' ->
+  multi step' t2' t3' ->
+  multi step' (cons' v1' t2') (cons' v1' t3').
+Proof.
+  intros v1' t2' t3' Hv Hms. induction Hms.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_Cons2'; eauto. auto.
+Qed.

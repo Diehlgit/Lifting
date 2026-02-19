@@ -13,33 +13,33 @@ Definition tass' := list (string * ty').
 
 Fixpoint msubst (ss:env) (t:tm) : tm :=
   match ss with
-  | nil => t
+  | [] => t
   | ((x,s)::ss') => msubst ss' (subst x s t)
   end.
 
 Fixpoint msubst' (ss:env') (t':tm') : tm' :=
   match ss with
-  | nil => t'
+  | [] => t'
   | ((x,s)::ss') => msubst' ss' (subst' x s t')
   end.
 
 
 Fixpoint mupdate (Gamma:context) (xts:tass) :=
   match xts with
-  | nil => Gamma
+  | [] => Gamma
   | ((x,v)::xts') => update (mupdate Gamma xts') x v
   end.
 
 Fixpoint mupdate' (Gamma':context') (xts:tass') :=
   match xts with
-  | nil => Gamma'
+  | [] => Gamma'
   | ((x,v)::xts') => update (mupdate' Gamma' xts') x v
   end.
 
 
 Fixpoint lookup {X} (k:string) (l:list(string * X)) : option X :=
   match l with
-  | nil => None
+  | [] => None
   | (j,x) :: l' => if eqb j k then Some x else lookup k l'
   end.
 
@@ -65,11 +65,31 @@ Qed.
 Fixpoint drop {X} (n:string) (nxs:list (string * X))
             : list (string * X) :=
   match nxs with
-    | nil => nil
+    | [] => []
     | ((n',x)::nxs') =>
         if String.eqb n' n then drop n nxs'
         else (n',x)::(drop n nxs')
   end.
+
+Lemma drop_comm : forall {X} x y (nxs:list (string * X)),
+      drop x (drop y nxs) = drop y (drop x nxs).
+Proof.
+  intros. induction nxs.
+  reflexivity.
+  destruct a.
+  destruct (eqb_spec s y); simpl.
+  - subst. rewrite eqb_refl.
+    destruct (eqb_spec y x); simpl.
+    + rewrite IHnxs. reflexivity.
+    + rewrite eqb_refl.
+      rewrite IHnxs. reflexivity.
+  - apply eqb_neq in n. rewrite n.
+    destruct (eqb_spec s x); simpl.
+    + subst. rewrite eqb_refl. exact IHnxs.
+    + apply eqb_neq in n0.
+      rewrite n, n0. f_equal.
+      exact IHnxs.
+Qed.
 
 Lemma mupdate_drop : forall (c: tass) Gamma x x',
       mupdate Gamma (drop x c) x'
@@ -99,9 +119,11 @@ Proof.
       subst. rewrite eqb_sym. apply eqb_neq in n. rewrite n; auto.
 Qed.
 
-
-
-
+Lemma msubst_subst: forall ss x v t,
+  msubst ss (subst x v t) = msubst ((x,v)::ss) t.
+Proof.
+  reflexivity.
+Qed.
 
 Lemma msubst_abs: forall ss x T t,
   msubst ss (abs x T t) = (abs x T (msubst (drop x ss) t)).
@@ -139,6 +161,39 @@ Proof.
     simpl. apply IHss.
 Qed.
 
+Lemma msubst_nil : forall ss,
+  msubst ss nil = nil.
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
+
+Lemma msubst_cons : forall ss t1 t2,
+  msubst ss (cons t1 t2) = cons (msubst ss t1) (msubst ss t2).
+Proof.
+   induction ss; intros.
+   reflexivity.
+   destruct a.
+    simpl. rewrite <- IHss. reflexivity.
+Qed.
+
+Lemma msubst_case : forall ss x y t1 tnil tcons,
+  msubst ss (case t1 tnil x y tcons) =
+  case (msubst ss t1) (msubst ss tnil) x y
+    (msubst (drop y (drop x ss)) tcons).
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a. simpl.
+    destruct (eqb s x); simpl.
+    - rewrite IHss. auto.
+    - destruct (eqb s y);
+      simpl; auto.
+Qed.
+
+
 Lemma msubst'_abs': forall ss x T' t',
   msubst' ss (abs' x T' t') = (abs' x T' (msubst' (drop x ss) t')).
 Proof.
@@ -175,6 +230,35 @@ Proof.
     simpl. apply IHss.
 Qed.
 
+Lemma msubst'_nil' : forall ss,
+  msubst' ss nil' = nil'.
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
 
+Lemma msubst'_cons' : forall ss t1' t2',
+  msubst' ss (cons' t1' t2') = cons' (msubst' ss t1') (msubst' ss t2').
+Proof.
+   induction ss; intros.
+   reflexivity.
+   destruct a.
+    simpl. rewrite <- IHss. reflexivity.
+Qed.
 
+Lemma msubst'_case' : forall ss x y t1' tnil' tcons',
+  msubst' ss (case' t1' tnil' x y tcons') =
+  case' (msubst' ss t1') (msubst' ss tnil') x y
+    (msubst' (drop y (drop x ss)) tcons').
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a. simpl.
+    destruct (eqb s x); simpl.
+    - rewrite IHss. auto.
+    - destruct (eqb s y);
+      simpl; auto.
+Qed.
 
