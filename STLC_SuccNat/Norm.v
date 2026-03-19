@@ -109,6 +109,7 @@ Proof with eauto.
   - (* T_Case *)
     destruct IHHtyp3 as [T' Hctx]... exists T'.
     unfold update, t_update in Hctx.
+    false_eqb_string.
     repeat false_eqb_string...
 Qed.
 
@@ -481,7 +482,7 @@ Proof.
          apply multistep_preserves_R' with (msubst ((x,v)::env0) t).
             eapply T_App. eauto.
             apply R_typable_empty; auto.
-            eapply multi_step_trans. eapply multistep_App2; eauto.
+            eapply multi_step_trans. eapply multistep_app2; eauto.
             eapply multi_step with (y:= (msubst ((x, v) :: env0) t)); [|apply multi_refl].
             simpl.  rewrite subst_msubst.
             eapply ST_AppAbs; eauto.
@@ -583,37 +584,24 @@ Proof.
           exact WT. apply multistep_case1. exact Hm.
           eapply multi_step. apply ST_CaseCons; auto.
           apply multi_refl.
-          assert ((subst x v2 (msubst (drop y (drop x env0)) tcons)) =
-                   msubst (drop y env0) (subst x v2 tcons)).
-          { rewrite subst_msubst. rewrite drop_comm. reflexivity.
-            pose proof (R_typable_empty P1).
-            pose proof (preservation_multi _ _ _ H0 Hm).
-            eapply typable_empty__closed.
-            inversion H2; eauto.
-            eapply instantiation_env_closed with (drop y c).
-            apply instantiation_drop. assumption. }
-          assert ((subst y v3 (msubst (drop y env0) (subst x v2 tcons))) =
-                  msubst env0 (subst y v3 (subst x v2 tcons))).
-          { rewrite <- subst_msubst. reflexivity.
-            pose proof (R_typable_empty P1).
-            pose proof (preservation_multi _ _ _ H1 Hm).
-            eapply typable_empty__closed.
-            inversion H3; eauto.
-            eapply instantiation_env_closed. exact V. }
-         rewrite H0, H2. clear P1 WT H0 H2.
-         repeat rewrite msubst_subst.
-         apply IHHT3 with ((x,Nat)::(y,NatList)::c).
-         { intros s. unfold update, t_update, lookup.
-           destruct (eqb_spec x s); auto.
-           destruct (eqb_spec y s); auto. }
-         { constructor; auto. split.
-              eapply preservation_multi in Hm; eauto.
-              inversion Hm; eauto.
-              split; auto using value_halts.
-              constructor; auto. split.
-              eapply preservation_multi in Hm; eauto.
-              inversion Hm; eauto.
-              split; auto using value_halts. }
+          rewrite drop_comm.
+          apply R_typable_empty in P1.
+          eapply (preservation_multi) in P1; eauto.
+          inversion P1; subst; clear P1 H1.
+          repeat rewrite <- subst_msubst;
+            eauto using typable_empty__closed,
+                        instantiation_env_closed.
+          repeat rewrite msubst_subst.
+          apply IHHT3 with ((x,Nat)::(y,NatList)::c).
+          { intros s. unfold update, t_update, lookup.
+            destruct (eqb_spec x s); auto.
+            destruct (eqb_spec y s); auto. }
+          { repeat (constructor;
+            [auto | split; [|split];
+             auto using value_halts |]).
+            assumption. }
+          eapply instantiation_env_closed with (drop y c).
+          apply instantiation_drop; auto.
 Qed.
 
 Theorem normalization : forall t T, has_type empty t T -> halts t.

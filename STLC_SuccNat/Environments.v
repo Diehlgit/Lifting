@@ -194,6 +194,12 @@ Proof.
 Qed.
 
 
+Lemma msubst'_subst': forall ss x v' t',
+  msubst' ss (subst' x v' t') = msubst' ((x,v')::ss) t'.
+Proof.
+  reflexivity.
+Qed.
+
 Lemma msubst'_abs': forall ss x T' t',
   msubst' ss (abs' x T' t') = (abs' x T' (msubst' (drop x ss) t')).
 Proof.

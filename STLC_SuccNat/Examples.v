@@ -466,11 +466,11 @@ Proof.
   split; [|split].
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step_trans.
-      eapply multistep_App2; eauto.
+      eapply multistep_app2; eauto.
       normalize.
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step'_trans.
-      eapply multistep'_App2'; eauto.
+      eapply multistep'_app2'; eauto.
       normalize.
   - eapply mapping_not_change_deriving. assumption.
 Qed.
@@ -485,14 +485,14 @@ Proof.
   split; [|split].
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step_trans.
-      eapply multistep_App2; eauto.
+      eapply multistep_app2; eauto.
       eapply multi_step.
       auto. simpl. eapply multi_step.
       auto. eapply multi_step.
       auto. apply multi_refl.
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step'_trans.
-      eapply multistep'_App2'; eauto.
+      eapply multistep'_app2'; eauto.
       eapply multi_step.
       auto. simpl. eapply multi_step.
       auto. eapply multi_step.
@@ -522,8 +522,8 @@ Proof.
     induction n; simpl; auto.
     constructor; constructor.
     inversion IHn; subst. auto.
-  - assert (Hms: multi step (app (plusn n) arg) (app (plusn n) (const r))).
-    { eapply multistep_App2.
+  - assert (Hms: multi step (app (plusn n) arg) (app (plusn n) r)).
+    { eapply multistep_app2.
       induction n; unfold plusn; auto.
       destruct Hsnf. assumption. }
     pose proof (normal_form_plusn n r) as [Hms0 _].
@@ -531,7 +531,7 @@ Proof.
     split; [|intros [x contra]; inversion contra].
     eassumption.
   - assert (Hms': multi step' (app' (lift (plusn n)) arg') (app' (lift (plusn n)) (const' r'))).
-    { eapply multistep'_App2'.
+    { eapply multistep'_app2'.
       induction n; unfold plusn; simpl; auto.
       destruct Hsnf'. assumption. }
     pose proof (normal_form'_lift_plusn n r') as [Hms0' _].

@@ -2,18 +2,22 @@ Require Import List Maps Presence_Conditions.
 Require Import STLC_SuccNat.
 Require Import Lifted_STLC_SuccNat.
 Import ListNotations.
-Require Import Norm Lifted_Norm.
+Require Import Norm Lifted_Norm Derivation.
 
 Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   has_type empty t T /\ has_type' empty t' (lift_ty T) /\
   match T with
   | Nat => exists r r',
-	          step_normal_form_of t (const r) /\
-	          step'_normal_form_of t' (const' r') /\
-	          derive r' cfg = Some r
+	          step_normal_form_of t r /\
+	          step'_normal_form_of t' r' /\
+	          derive' cfg r' = Some r
   | (Arrow T1 T2) => forall arg arg',
             LR cfg T1 arg arg' ->
             LR cfg T2 (app t arg) (app' t' arg')
+  | NatList => exists r r',
+	          step_normal_form_of t r /\
+	          step'_normal_form_of t' r' /\
+	          derive' cfg r' = Some r
   end.
 
 Lemma LR_typable_empty : forall {cfg} {T} {t} {t'},
@@ -64,10 +68,23 @@ Proof.
     destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
     exists r, r'. split; [|split]; auto.
     clear Hsnf' Hd Hty Hty'.
-    destruct Hsnf as [Hms _].
-    split; [|intros [x contra]; inversion contra].
-    inversion Hms; subst;
-      try solve_by_inverts 1.
+    destruct Hsnf as [Hms Hv].
+    split; auto.
+    inversion Hms; subst.
+    exfalso; apply Hv; eauto.
+    apply (determinism _ _ _ H) in E.
+    rewrite E in *.
+    assumption.
+  (* NatList *)
+  - split; [|split]; auto.
+    eapply preservation; eauto.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
+    exists r, r'. split; [|split]; auto.
+    clear Hsnf' Hd Hty Hty'.
+    destruct Hsnf as [Hms Hv].
+    split; auto.
+    inversion Hms; subst.
+    exfalso; apply Hv; eauto.
     apply (determinism _ _ _ H) in E.
     rewrite E in *.
     assumption.
@@ -92,10 +109,23 @@ Proof.
     destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
     exists r, r'. split; [|split]; auto.
     clear Hsnf Hd Hty Hty'.
-    destruct Hsnf' as [Hms' _].
-    split; [|intros [x contra]; inversion contra].
-    inversion Hms'; subst;
-      try solve_by_inverts 1.
+    destruct Hsnf' as [Hms' Hv'].
+    split; auto.
+    inversion Hms'; subst.
+    exfalso; apply Hv'; eauto.
+    apply (determinism' _ _ _ H) in E.
+    rewrite E in *.
+    assumption.
+  (* NatList *)
+  - split; [|split]; auto.
+    eapply preservation'; eauto.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
+    exists r, r'. split; [|split]; auto.
+    clear Hsnf Hd Hty Hty'.
+    destruct Hsnf' as [Hms' Hv'].
+    split; auto.
+    inversion Hms'; subst.
+    exfalso; apply Hv'; eauto.
     apply (determinism' _ _ _ H) in E.
     rewrite E in *.
     assumption.
@@ -124,8 +154,16 @@ Proof.
     destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
     exists r, r'. split; [|split]; auto.
     clear Hsnf' Hd Hty Hty'.
-    destruct Hsnf as [Hms _].
-    split; [|intros [x contra]; inversion contra].
+    destruct Hsnf as [Hms Hv].
+    split; auto.
+    inversion Hms; subst; eauto.
+  (* NatList *)
+  - split; [|split]; auto.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    exists r, r'. split; [|split]; auto.
+    clear Hsnf' Hd Hty Hty'.
+    destruct Hsnf as [Hms Hv].
+    split; auto.
     inversion Hms; subst; eauto.
 Qed.
 
@@ -152,8 +190,16 @@ Proof.
     destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
     exists r, r'. split; [|split]; auto.
     clear Hsnf Hd Hty Hty'.
-    destruct Hsnf' as [Hms' _].
-    split; [|intros [x contra]; inversion contra].
+    destruct Hsnf' as [Hms' Hv'].
+    split; auto.
+    inversion Hms'; subst; eauto.
+  (* NatList *)
+  - split; [|split]; auto.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    exists r, r'. split; [|split]; auto.
+    clear Hsnf Hd Hty Hty'.
+    destruct Hsnf' as [Hms' Hv'].
+    split; auto.
     inversion Hms'; subst; eauto.
 Qed.
 
@@ -223,40 +269,96 @@ Proof.
   apply (mstep'_preserves_LR' _ _ _ t1') in H3; auto.
   apply (preservation_multi _ _ _ H) in H1 as H5.
   apply (mstep_preserves_LR' _ _ t1) in H3; auto.
-Qed.  
-  
-Lemma soundness: forall cfg analysis,
-  LR cfg (Arrow Nat Nat) analysis (lift analysis) ->
-  (forall spl p r' r,
-    derive spl cfg = Some p ->
-    step_normal_form_of (app analysis (const p)) (const r) ->
-    step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
-    derive r' cfg = Some r
-  ).
-Proof.
-  intros cfg analysis HLR spl p r' r Hd Hsnf Hsnf'.
-  unfold LR in HLR. destruct HLR as [HT [HT' HLR] ].
-  specialize HLR with (arg:=(const p)) (arg':=(const' spl)).
-  destruct HLR.
-  { split; [|split]; auto.
-    exists p, spl; split; [|split];
-      try (split;[apply multi_refl| intros [x contra]; inversion contra]);
-      assumption. }
-  destruct H0 as [_ [r0 [r0' [Hsnf0 [Hsnf0' Hd0'] ] ] ] ].
-
-  apply (normal_forms_unique _ _ _ Hsnf0) in Hsnf.
-  injection Hsnf as Hsnf; subst.
-
-  apply (normal_forms'_unique _ _ _ Hsnf0') in Hsnf'.
-  injection Hsnf' as Hsnf'; subst.
-
-  assumption.
 Qed.
+
+Definition commutes T cfg analysis := forall spl p r r',
+  has_type' empty spl (lift_ty T) ->
+  derive' cfg spl = Some p ->
+  step_normal_form_of (app analysis p) r ->
+  step'_normal_form_of (app' (lift analysis) spl) r' ->
+  derive' cfg r' = Some r.
+
+Definition base_ty T := T = Nat \/ T = NatList.
+(*TODO: A Software analysis function should be of type NatList -> T.
+    This makes definitions easier to deal with without loosing
+    expressiviness of the Lifted Language. A Variational Natural
+    is represented by a List with only one value. *)
+
+Lemma soundness: forall T cfg analysis,
+  LR cfg (Arrow NatList T) analysis (lift analysis) ->
+    commutes NatList cfg analysis.
+Proof.
+  intros T conf analysis HLR spl p r r' Hty Hd Hsnf Hsnf'.
+  unfold LR in HLR. fold LR in HLR.
+  destruct HLR as [_ [_ HLR]].
+  specialize HLR with (arg:=p) (arg':=spl).
+  assert (LR conf T (app analysis p) (app' (lift analysis) spl)).
+  { apply HLR. clear HLR.
+    split; [|split].
+    replace NatList with (type_derivation NatList') by reflexivity.
+    eapply deriving'_types; eauto.
+    eassumption.
+    exists p, spl; split; [|split];
+    pose proof (derive'_value _ _ _ Hd) as [Hv Hv'];
+    apply value_is_nf in Hv; auto;
+    apply value'_is_nf in Hv'; auto. }
+  clear HLR. assert (LR conf NatList p spl).
+  { split; [|split].
+    replace NatList with (type_derivation NatList') by reflexivity.
+    eapply deriving'_types; eassumption.
+    assumption. exists p, spl.
+    split;[|split].
+    apply derive'_value in Hd as [].
+    apply value_is_nf; assumption.
+    apply derive'_value in Hd as [].
+    apply value'_is_nf; assumption.
+    assumption. }
+Abort.
+
+
+Lemma soundness: forall T cfg analysis,
+  base_ty T ->
+  LR cfg (Arrow T T) analysis (lift analysis) ->
+    commutes T cfg analysis.
+Proof.
+  intros T cfg analysis Hbt HLR spl p r r' Hty Hd Hsnf Hsnf'.
+  unfold LR in HLR. destruct HLR as [_ [_ HLR]].
+  specialize HLR with (arg:=p) (arg':=spl).
+  destruct Hbt; subst; destruct HLR;
+    try (destruct H0 as [_ [r0 [r0' [Hsnf0 [Hsnf0' Hd0']]]]];
+         apply (normal_forms_unique _ _ _ Hsnf0) in Hsnf;
+         apply (normal_forms'_unique _ _ _ Hsnf0') in Hsnf';
+         subst; assumption).
+  (* Nat *)
+  { split; [|split].
+    replace Nat with (type_derivation Nat') by reflexivity.
+    eapply deriving'_types; eauto.
+    assumption.
+    exists p, spl; split; [|split];
+    pose proof (derive'_value _ _ _ Hd) as [Hv Hv'];
+    apply value_is_nf in Hv; auto;
+    apply value'_is_nf in Hv'; auto. }
+
+  (* NatList *)
+  { split; [|split].
+    replace NatList with (type_derivation NatList') by reflexivity.
+    eapply deriving'_types; eauto.
+    assumption.
+    exists p, spl; split; [|split];
+    pose proof (derive'_value _ _ _ Hd) as [Hv Hv'];
+    apply value_is_nf in Hv; auto;
+    apply value'_is_nf in Hv'; auto. }
+Qed.
+(*TODO: maybe prove:
+         has_type' empty spl (lift_ty Nat) ->
+         derive' conf spl = Some p ->o
+         has_type empty p Nat.
+        to automate Nat and NatList cases.*)
 
 Require Import Environments.
 
 Inductive instantiation : feat_config -> tass -> env -> env' -> Prop :=
-  | V_nil : forall cfg, instantiation cfg nil nil nil
+  | V_nil : forall cfg, instantiation cfg [] [] []
   | V_cons : forall cfg x T v v' c e e',
     instantiation cfg c e e'->
     value v -> value' v' ->
@@ -368,7 +470,40 @@ Proof.
     destruct (String.eqb x x0); auto. constructor; eauto.
 Qed.
 
-(*TODO: Is there a way to prove T_Abs case without LR_halts?*)
+Lemma related_canonical_forms_list: forall v v',
+  has_type empty v NatList ->
+  has_type' empty v' NatList' ->
+  value v -> value' v' ->
+  (exists cfg, derive' cfg v' = Some v) ->
+    (v = nil /\ v' = nil') \/
+    (exists v1 v2 v1' v2',
+      value' v1' /\ value' v2' /\
+      value v1 /\ value v2 /\
+      v' = cons' v1' v2' /\ v = cons v1 v2).
+Proof.
+  intros v v' Hty Hty' Hv Hv' [cfg Hd].
+  apply (canonical_forms_list v Hty) in Hv.
+  apply (canonical_forms_list' v' Hty') in Hv'.
+  destruct Hv; destruct Hv'.
+  - left. split; auto.
+  - destruct H0 as [v1' [v2' [Hv1' [Hv2' Heq]]]].
+    subst. simpl in Hd.
+    destruct (derive' cfg v1');
+    destruct (derive' cfg v2');
+      try solve_by_inverts 1.
+  - destruct H as [v1 [v2 [Hv1 [Hv2 Heq]]]].
+    subst. simpl in Hd.
+    inversion Hd.
+  - destruct H0 as [v1' [v2' [Hv1' [Hv2' Heq]]]].
+    subst.
+    destruct H as [v1 [v2 [Hv1 [Hv2 Heq]]]].
+    subst. right.
+    exists v1, v2, v1', v2'.
+    repeat split; auto.
+Qed.
+
+(* Pattern matching acts like lambda abstraction because
+   evaluating it envolves beta reduction. *)
 Lemma completeness: forall c env env' t T cfg,
   has_type (mupdate empty c)  t T ->
   instantiation cfg c env env' ->
@@ -404,7 +539,7 @@ Proof.
       + auto.
       + rewrite H.
         clear - c n. induction c.
-        simpl. rewrite false_eqb_string; auto.
+        simpl. apply eqb_neq in n; rewrite n; auto.
         simpl. destruct a.  unfold update, t_update.
         destruct (String.eqb s x0); auto. }
      assert (Hty': has_type' empty (abs' x (lift_ty T2) (msubst' (drop x env0') (lift t)))
@@ -421,7 +556,7 @@ Proof.
       + auto.
       + rewrite H.
         clear - c n. induction c.
-        simpl. rewrite false_eqb_string; auto.
+        simpl. apply eqb_neq in n; rewrite n; auto.
         simpl. destruct a. simpl.
         unfold update, t_update.
         destruct (String.eqb s x0); auto. }
@@ -434,7 +569,7 @@ Proof.
         eapply LR_typable_empty; eauto. }
       { eapply T_App'; eauto.
         eapply LR_typable_empty; eauto. }
-      { eapply multi_step_trans. eapply multistep_App2; eauto.
+      { eapply multi_step_trans. eapply multistep_app2; eauto.
             eapply multi_step with (y:= (msubst ((x, v) :: env0) t));
               [|apply multi_refl].
             simpl.  rewrite subst_msubst.
@@ -442,7 +577,7 @@ Proof.
             eapply typable_empty__closed.
             apply (LR_typable_empty H1).
             eapply instantiation_env_closed; eauto. }
-      { eapply multi_step'_trans. eapply multistep'_App2'; eauto.
+      { eapply multi_step'_trans. eapply multistep'_app2'; eauto.
             eapply multi_step with (y:= (msubst' ((x, v') :: env0') (lift t)));
               [|apply multi_refl].
             simpl.  rewrite subst'_msubst'.
@@ -457,14 +592,14 @@ Proof.
     rewrite msubst_app, msubst'_app'.
     pose proof (IHHT1 c H env0 env0' V).
     unfold LR in H0; fold LR in H0.
-    destruct H0 as [HT [HT' HLR] ].
+    destruct H0 as [_ [_ HLR] ].
     pose proof (IHHT2 c H env0 env0' V).
     auto.
   - (* T_Const *)
     split; [|split].
     rewrite msubst_const. auto.
     rewrite msubst'_const'. auto.
-    exists n, [(n,pc_True)].
+    exists (const n), (const' [(n,pc_True)]).
     split; [|split].
     + rewrite msubst_const. split;
         [eapply multi_refl
@@ -474,36 +609,250 @@ Proof.
         | intros [x contra]; inversion contra].
     + reflexivity.
   - (* T_Succ *)
-    destruct (IHHT c H env0 env0' V) as [HT0 [HT' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
+    destruct (IHHT c H env0 env0' V) as [HT0 [HT' [r [r' [ [Hms Hnf] [ [Hms' _] Hd]]]]]].
     split; [|split].
     rewrite msubst_succ. auto.
     rewrite msubst'_succ'. auto.
+    apply (preservation_multi _ _ _ HT0) in Hms as Hty.
+    pose proof (derive'_value _ _ _ Hd) as [Hv Hv'].
+    apply (preservation'_multi _ _ _ HT') in Hms' as Hty'.
+    apply (canonical_forms_nat _ Hty) in Hv as [n H1].
+    apply (canonical_forms_nat' _ Hty') in Hv' as [n' H2].
+    subst; clear Hty Hty'.
     eexists; eexists.
     split; [|split].
-    + rewrite msubst_succ. split;
-        [|intros [x contra]; inversion contra].
+    + rewrite msubst_succ. split.
         eapply multi_step_trans.
         apply multistep_succ; eassumption.
-        eauto.
-    + rewrite msubst'_succ'. split;
-        [|intros [x contra]; inversion contra].
+        eapply multi_step. apply ST_SuccConst.
+        apply multi_refl.
+        intros []; solve_by_inverts 1.
+    + rewrite msubst'_succ'. split.
         eapply multi_step'_trans.
         apply multistep'_succ'; eassumption.
-        eauto.
-    + apply mapping_not_change_deriving. assumption.
+        eapply multi_step. apply ST_SuccConst'.
+        apply multi_refl.
+        intros []; solve_by_inverts 1.
+    + simpl. simpl in Hd.
+      erewrite mapping_not_change_deriving;
+      auto. destruct (derive n' cfg) eqn:Heq;
+      try solve_by_inverts 1.
+      injection Hd as Hd; auto.
+  - (* T_Nil *)
+    split; [|split].
+    rewrite msubst_nil. auto.
+    rewrite msubst'_nil'. auto.
+    exists nil, nil'.
+    split; [|split].
+    + rewrite msubst_nil. split;
+        [eapply multi_refl
+        | intros [x contra]; inversion contra].
+    + rewrite msubst'_nil'. split;
+        [eapply multi_refl
+        | intros [x contra]; inversion contra].
+    + reflexivity.
+  - (* T_Cons *)
+    rewrite msubst_cons, msubst'_cons'.
+    pose proof (IHHT1 c H env0 env0' V).
+    unfold LR in H0; fold LR in H0.
+    destruct H0 as [Hty1 [Hty1' HLR]].
+    pose proof (IHHT2 c H env0 env0' V).
+    clear IHHT1 IHHT2.
+    split; [|split];
+    try (constructor; auto;
+    destruct (LR_typable_empty H0) as [H1 H2]; auto).
+    destruct HLR as [r1 [r1' [[Hms1 Hnf1] [[Hms1' Hnf1'] Hd1]]]].
+    unfold LR in H0.
+    destruct H0 as [_ [_ [r2 [r2' [[Hms2 Hnf2] [[Hms2' Hnf2'] Hd2]]]]]].
+    eexists; eexists.
+    split; [|split].
+    + split. eapply multi_step_trans.
+      eapply multistep_cons1.
+      eassumption.
+      eapply multi_step_trans.
+      eapply multistep_cons2.
+      eapply derive'_value; eauto.
+      eassumption.
+      apply multi_refl.
+      intros [x contra];
+      inversion contra;
+        try solve_by_inverts 1;
+        subst; [apply Hnf1|apply Hnf2];
+        eexists; eassumption.
+    + split. eapply multi_step'_trans.
+      eapply multistep'_cons1'.
+      eassumption.
+      eapply multi_step'_trans.
+      eapply multistep'_cons2'.
+      eapply derive'_value; eauto.
+      eassumption.
+      apply multi_refl.
+      intros [x contra];
+      inversion contra;
+        try solve_by_inverts 1;
+        subst; [apply Hnf1'|apply Hnf2'];
+        eexists; eassumption.
+    + clear - Hd1 Hd2. simpl.
+      rewrite Hd1, Hd2.
+      reflexivity.
+  - (* T_Case *)
+    rewrite msubst_case, msubst'_case'.
+
+    assert (Hty: has_type empty (case (msubst env0 t1) (msubst env0 tnil) x y
+     (msubst (drop y (drop x env0)) tcons)) (T)).
+    { apply T_Case.
+      eapply msubst_preserves_typing. eassumption.
+      eapply context_invariance. apply HT1.
+      intros. rewrite <- mupdate_lookup. auto.
+      eapply msubst_preserves_typing. eassumption.
+      eapply context_invariance. apply HT2.
+      intros. rewrite <- mupdate_lookup. auto.
+      eapply msubst_preserves_typing.
+      repeat (apply instantiation_drop); eauto.
+      eapply context_invariance. apply HT3.
+      intros.
+      unfold update, t_update. repeat (rewrite mupdate_drop).
+      destruct (eqb_spec x x0); destruct (eqb_spec y x0);
+        try auto.
+        rewrite H.
+        clear - c n n0. induction c.
+        simpl. apply eqb_neq in n, n0; try rewrite n, n0; auto.
+        simpl. destruct a.  unfold update, t_update.
+        destruct (String.eqb s x0); auto. }
+     assert (Hty': has_type' empty (case' (msubst' env0' (lift t1)) (msubst' env0' (lift tnil)) x y
+     (msubst' (drop y (drop x env0')) (lift tcons))) (lift_ty T)).
+     { apply T_Case'.
+       eapply msubst'_preserves_typing. eassumption.
+       eapply context'_invariance. apply (lifting_types _ _ _ HT1).
+       intros. rewrite <- mupdate'_lookup.
+       unfold lift_context. unfold lift_tass.
+       rewrite H. clear - c. induction c. auto.
+         destruct a. simpl.
+         destruct (String.eqb s x0); auto.
+
+      eapply msubst'_preserves_typing. eassumption.
+      eapply context'_invariance. apply (lifting_types _ _ _ HT2).
+      intros. rewrite <- mupdate'_lookup.
+      unfold lift_context. unfold lift_tass.
+       rewrite H. clear - c. induction c. auto.
+         destruct a. simpl.
+      destruct (String.eqb s x0); auto.
+
+      eapply msubst'_preserves_typing.
+      repeat (apply instantiation_drop); eauto.
+      eapply context'_invariance. apply (lifting_types _ _ _ HT3).
+      intros.
+      unfold update, t_update, lift_context.
+      repeat (rewrite lift_tass_drop, mupdate'_drop).
+      destruct (eqb_spec x x0); destruct (eqb_spec y x0);
+        try auto.
+        rewrite H.
+        clear - c n n0. induction c.
+        simpl. apply eqb_neq in n, n0; try rewrite n, n0; auto.
+        destruct a. simpl. unfold update, t_update.
+        destruct (String.eqb s x0); auto. }
+
+(*      destruct T; (simpl;
+      split;[|split]); auto.*)
+      pose proof (IHHT1 c H env0 env0' V).
+      unfold LR in H0. destruct H0 as [_ [_ [v1 [v1' [Hsnf [Hsnf' Hdv1]]]]]].
+      inversion Hty; inversion Hty'; subst.
+      pose proof (wt_nf_is_value _ _ _ H7 Hsnf); clear H8 H9.
+      pose proof (wt_nf_is_value' _ _ _ H17 Hsnf'); clear H18 H19.
+(*      intros arg arg' H2.*)
+      destruct Hsnf as [Hms _]. destruct Hsnf' as [Hms' _].
+      eapply mstep_mstep'__preserves_LR'.
+        exact Hty. exact Hty'.
+        eapply multistep_case1; eassumption.
+        eapply multistep'_case1'; eassumption.
+(*        econstructor; eauto;
+        try (apply LR_typable_empty in H2 as []; auto).
+        econstructor; eauto;
+        try (apply LR_typable_empty in H2 as []; auto).
+        eapply multistep_app1, multistep_case1; eassumption.
+        eapply multistep'_app1', multistep'_case1'; eassumption.*)
+        pose proof (preservation_multi _ _ _ H7 Hms).
+        pose proof (preservation'_multi _ _ _ H17 Hms').
+        clear H7 H17.
+
+        pose proof (related_canonical_forms_list v1 v1' H2 H3 H0 H1).
+        destruct H4. exists cfg; auto. clear H2 H3.
+        (* Case Nil *)
+        { destruct H4; subst. clear H0 H1 Hdv1 Hms Hms'.
+          eapply mstep_mstep'__preserves_LR'.
+          inversion Hty; subst.
+          constructor; eauto.
+          inversion Hty'; subst.
+          constructor; eauto.
+          eapply multi_step.
+          apply ST_CaseNil.
+          apply multi_refl.
+          eapply multi_step.
+          apply ST_CaseNil'.
+          apply multi_refl.
+          eapply IHHT2; auto. }
+        (* Case Cons *)
+        { destruct H4 as [v2 [v3 [v2' [v3' [Hv2' [Hv3' [Hv2 [Hv3 [Heq Heq']]]]]]]]].
+          subst. eapply mstep_mstep'__preserves_LR'.
+          inversion Hty; subst.
+          constructor; eauto.
+          inversion Hty'; subst.
+          constructor; eauto.
+          eapply multi_step.
+          apply ST_CaseCons; auto.
+          apply multi_refl.
+          eapply multi_step.
+          apply ST_CaseCons'; auto.
+          apply multi_refl.
+          rewrite drop_comm.
+          repeat rewrite <- subst_msubst.
+          repeat rewrite msubst_subst.
+          rewrite drop_comm.
+          repeat rewrite <- subst'_msubst'.
+          repeat rewrite msubst'_subst'.
+          apply IHHT3 with (c:= ((x,Nat) :: (y, NatList) :: c)).
+          - intros s. unfold update, t_update, lookup.
+            destruct (String.eqb x s); auto;
+            destruct (String.eqb y s); auto.
+          - repeat constructor; auto.
+            inversion H2; subst; auto.
+            inversion H3; subst; auto.
+            apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
+            exists v3, v3'. repeat split; auto.
+            apply value_is_nf; auto.
+            apply value'_is_nf; auto.
+            inversion H2; subst; auto.
+            inversion H3; subst; auto.
+            apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
+            exists v2, v2'. repeat split; auto.
+            apply value_is_nf; auto.
+            apply value'_is_nf; auto.
+          - eapply typable_empty__closed'.
+            inversion H3; subst; eauto.
+          - eapply instantiation_env_closed. eassumption.
+          - eapply typable_empty__closed'.
+            inversion H3; subst; eauto.
+          - eapply instantiation_env_closed.
+            eapply instantiation_drop. eassumption.
+          - eapply typable_empty__closed.
+            inversion H2; subst; eauto.
+          - eapply instantiation_env_closed. eassumption.
+          - eapply typable_empty__closed.
+            inversion H2; subst; eauto.
+          - eapply instantiation_env_closed.
+            eapply instantiation_drop. eassumption. }
 Qed.
 
-Theorem commutativity: forall cfg analysis spl p r r',
-  has_type empty analysis (Arrow Nat Nat) ->
-  derive spl cfg = Some p ->
-  step_normal_form_of (app analysis (const p)) (const r) ->
-  step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
-  derive r' cfg = Some r.
+Theorem commutativity: forall T cfg analysis,
+  base_ty T ->
+  has_type empty analysis (Arrow T T) ->
+  commutes T cfg analysis.
 Proof.
-  intros cfg analysis spl p r r' HLR.
-  apply soundness.
-  replace (lift analysis) with (msubst' nil (lift analysis)) by reflexivity.
-  replace analysis with (msubst nil analysis) by reflexivity.
-  apply (completeness nil); auto.
+  intros T cfg analysis Hbt HLR.
+  apply soundness. assumption.
+  replace (lift analysis) with (msubst' [] (lift analysis)) by reflexivity.
+  replace analysis with (msubst [] analysis) by reflexivity.
+  apply (completeness []); auto.
   apply V_nil.
 Qed.
+

@@ -355,6 +355,18 @@ Proof.
   - remember (determinism _ _ _ H H0) as e. congruence.
 Qed.
 
+Lemma wt_nf_is_value: forall t1 t2 T,
+  has_type empty t1 T ->
+  step_normal_form_of t1 t2 ->
+  value t2.
+Proof.
+  intros t1 t2 T HT [Hms Hnf].
+  apply (preservation_multi _ _ _ HT) in Hms.
+  apply progress in Hms as [].
+  - assumption.
+  - destruct Hnf. assumption.
+Qed.
+
 (* Auxiliary Lemmas about the language's functioning *)
 
 Lemma succ_arg_normalizes: forall t1 t2,
@@ -384,7 +396,16 @@ Proof.
     + exact H23.
 Qed.
 
-Lemma multistep_App2 : forall v t1 t2,
+Lemma multistep_app1: forall t1 t2 t3,
+  multi step t1 t2 -> multi step (app t1 t3) (app t2 t3).
+Proof.
+  intros t1 t2 t3 STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_App1; eauto.  auto.
+Qed.
+
+Lemma multistep_app2 : forall v t1 t2,
   value v -> (multi step t1 t2) -> multi step (app v t1) (app v t2).
 Proof.
   intros v t t' V STM. induction STM.

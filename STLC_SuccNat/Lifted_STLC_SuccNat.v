@@ -300,6 +300,19 @@ Proof.
     apply IHHmulti. apply H.
 Qed.
 
+Lemma wt_nf_is_value': forall t1' t2' T',
+  has_type' empty t1' T' ->
+  step'_normal_form_of t1' t2' ->
+  value' t2'.
+Proof.
+  intros t1' t2' T' HT [Hms' Hnf'].
+  apply (preservation'_multi _ _ _ HT) in Hms'.
+  apply progress' in Hms' as [].
+  - assumption.
+  - destruct Hnf'. assumption.
+Qed.
+
+
 (* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:feat_config) (p:nat) (analysis:nat->nat),
   derive spl cfg = Some p ->
@@ -600,7 +613,16 @@ Proof.
     + exact IHHmulti.
 Qed.
 
-Lemma multistep'_App2' : forall v' t' t1',
+Lemma multistep'_app1': forall t1' t2' t3',
+  multi step' t1' t2' -> multi step' (app' t1' t3') (app' t2' t3').
+Proof.
+  intros t1' t2' t3' STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_App1'; eauto.  auto.
+Qed.
+
+Lemma multistep'_app2' : forall v' t' t1',
   value' v' -> (multi step' t' t1') -> multi step' (app' v' t') (app' v' t1').
 Proof.
   intros v t t' V STM. induction STM.
@@ -636,4 +658,14 @@ Proof.
     apply multi_refl.
     eapply multi_step.
       apply ST_Cons2'; eauto. auto.
+Qed.
+
+Lemma multistep'_case1' : forall x y t1' t2' tnil' tcons',
+  multi step' t1' t2' -> multi step' (case' t1' tnil' x y tcons')
+                                 (case' t2' tnil' x y tcons').
+Proof.
+  intros x y t1' t2' tnil' tcons' Hms. induction Hms.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_Case1'; eauto. auto.
 Qed.
