@@ -139,6 +139,15 @@ Proof.
     simpl. apply IHss.
 Qed.
 
+Lemma msubst_add : forall ss t1 t2,
+  msubst ss (add t1 t2) = add (msubst ss t1) (msubst ss t2).
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
+
 Lemma msubst'_abs': forall ss x T' t',
   msubst' ss (abs' x T' t') = (abs' x T' (msubst' (drop x ss) t')).
 Proof.
@@ -168,6 +177,15 @@ Qed.
 
 Lemma msubst'_succ' : forall ss t',
   msubst' ss (succ' t') = succ' (msubst' ss t').
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
+
+Lemma msubst'_add' : forall ss t1' t2',
+  msubst' ss (add' t1' t2') = add' (msubst' ss t1') (msubst' ss t2').
 Proof.
   induction ss; intros.
     reflexivity.

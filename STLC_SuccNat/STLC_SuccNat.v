@@ -61,7 +61,7 @@ Inductive step : tm -> tm -> Prop :=
     step t2 t2' ->
       step (add v1 t2) (add v1 t2')
   | ST_AddConst: forall (n1 n2 : nat),
-    step (add (const n1) (const n2)) (const (n1 + n1)).
+    step (add (const n1) (const n2)) (const (n1 + n2)).
 
 Inductive multi {X : Type} (R : X -> X -> Prop) : X -> X -> Prop :=
   | multi_refl : forall (x : X), multi R x x

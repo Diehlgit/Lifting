@@ -442,7 +442,7 @@ Proof.
             eapply typable_empty__closed.
             apply (LR_typable_empty H1).
             eapply instantiation_env_closed; eauto. }
-      { eapply multi_step'_trans. eapply multistep'_App2'; eauto.
+      { eapply multi_step'_trans. eapply multistep'_app2'; eauto.
             eapply multi_step with (y:= (msubst' ((x, v') :: env0') (lift t)));
               [|apply multi_refl].
             simpl.  rewrite subst'_msubst'.
@@ -491,6 +491,30 @@ Proof.
         apply multistep'_succ'; eassumption.
         eauto.
     + apply mapping_not_change_deriving. assumption.
+  - (* T_Add *)
+    rewrite msubst_add, msubst'_add'.
+    destruct (IHHT1 c H env0 env0' V) as [HT11 [HT1' [r1 [r1' [[Hms1 _] [[Hms1' _] Hd1]]]]]].
+    destruct (IHHT2 c H env0 env0' V) as [HT22 [HT2' [r2 [r2' [[Hms2 _] [[Hms2' _] Hd2]]]]]].
+    split; [|split]; auto.
+    exists (r1 + r2), (app_binop Nat.add r1' r2').
+    split; [|split]; try split.
+    + eapply multi_step_trans.
+      apply multistep_add1; eassumption.
+      eapply multi_step_trans.
+      apply multistep_add2; eauto.
+      eapply multi_step. apply ST_AddConst.
+      apply multi_refl.
+    + intros [x contra]; inversion contra.
+    + eapply multi_step'_trans.
+      apply multistep'_add1'; eassumption.
+      eapply multi_step'_trans.
+      apply multistep'_add2'; eauto.
+      eapply multi_step. apply ST_AddConst'.
+      apply multi_refl.
+    + intros [x contra]; inversion contra.
+    + apply binop_not_change_deriving.
+      assumption.
+      assumption.
 Qed.
 
 Theorem commutativity: forall cfg analysis spl p r r',

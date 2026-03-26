@@ -492,12 +492,12 @@ Proof.
       simpl. apply ST_Add2';
         try (apply value_value' in H1);
         assumption.
-    + simpl. replace [(n1 + n1, pc_True)]
+    + simpl. replace [(n1 + n2, pc_True)]
       with (app_binop Nat.add [(n1, pc_True)] [(n2, pc_True)]).
       apply ST_AddConst'. simpl.
       (*TODO: to prove this we could define presence condition
         normalization to evaluate expressions of literals *)
-Admitted.
+Abort.
 
 Lemma mstep_mstep': forall t1 t2,
   multi step t1 t2 ->
@@ -507,9 +507,9 @@ Proof.
   induction Hmulti.
   - apply multi_refl.
   - eapply multi_step with (y:= (lift y)).
-    + apply step_step'. apply H.
-    + exact IHHmulti.
-Qed.
+(*    + apply step_step'. apply H.
+    + exact IHHmulti. *)
+Abort.
 
 Lemma multistep'_app2' : forall v' t' t1',
   value' v' -> (multi step' t' t1') -> multi step' (app' v' t') (app' v' t1').
