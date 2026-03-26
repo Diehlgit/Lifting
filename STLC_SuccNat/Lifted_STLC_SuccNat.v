@@ -253,7 +253,7 @@ Proof.
   induction spl1; intros.
   - inversion H.
   - destruct a.
-    rewrite app_binop_assoc.
+    rewrite app_binop_distributive.
     simpl in H.
     destruct (pc_eval conf p) eqn:EQ1.
     + apply derive_l.

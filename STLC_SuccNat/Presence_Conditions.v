@@ -66,7 +66,7 @@ Compute app_binop Nat.add [(1,pc_True);(0,pc_False)] [].
 
 Compute app_binop Nat.add [] [(2,pc_True);(3,pc_False)].
 
-Lemma app_binop_assoc {T} : forall (op:T->T->T) (v1' v2':variational_value T) (v:T) (p:pc),
+Lemma app_binop_distributive {T} : forall (op:T->T->T) (v1' v2':variational_value T) (v:T) (p:pc),
   app_binop op ((v, p) :: v1') v2' =
   (app_binop op [(v, p)] v2') ++ (app_binop op v1' v2').
 Proof.
