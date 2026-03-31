@@ -26,28 +26,9 @@ Proof.
     destruct H as [_ [H _] ]; assumption.
 Qed.
 
-(* This proof depends on normalization
-   Reasoning: Suppose we could prove LR_halts without
-   using normalization theorem.
-   Then we could alse prove completeness theorem without using
-   the normalization theorem.
-   But now we proved that every well typed term is in the relation
-   (completeness)
-   and we also proved that every term in the relation halts
-   (LR_halts)
-   This implies that ever well typed term halts
-   (normalization)
-*)
-Lemma LR_halts: forall {cfg} {T} {t} {t'},
-  LR cfg T t t' -> halts t /\ halts' t'.
-Proof.
-  intros. split; [eapply normalization| eapply normalization'];
-  eapply LR_typable_empty; eassumption.
-Qed.
-
 Lemma step_preserves_LR : forall T cfg t1 t2 t', (step t1 t2) -> LR cfg T t1 t' -> LR cfg T t2 t'.
 Proof.
- induction T;  intros cfg t1 t2 t' E Rt; unfold R; fold R; unfold R in Rt; fold R in Rt;
+ induction T;  intros cfg t1 t2 t' E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
   - split; [|split].
@@ -56,7 +37,7 @@ Proof.
     clear Hty Hty'.
     intros.
     eapply IHT2.
-    apply ST_App1. apply E.
+    apply ST_App. apply E.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
@@ -75,7 +56,7 @@ Qed.
 
 Lemma step'_preserves_LR : forall T cfg t t1' t2', (step' t1' t2') -> LR cfg T t t1' -> LR cfg T t t2'.
 Proof.
- induction T;  intros cfg t t1' t2' E Rt; unfold R; fold R; unfold R in Rt; fold R in Rt;
+ induction T;  intros cfg t t1' t2' E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
   - split; [|split].
@@ -84,7 +65,7 @@ Proof.
     clear Hty Hty'.
     intros.
     eapply IHT2.
-    apply ST_App1'. apply E.
+    apply ST_App'. apply E.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
@@ -106,7 +87,7 @@ Lemma step_preserves_LR' : forall T cfg t1 t2 t',
   (step t1 t2) ->
   LR cfg T t2 t' -> LR cfg T t1 t'.
 Proof.
- induction T;  intros cfg t1 t2 t' HT E Rt; unfold R; fold R; unfold R in Rt; fold R in Rt;
+ induction T;  intros cfg t1 t2 t' HT E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
   - split; [|split].
@@ -117,7 +98,7 @@ Proof.
     eapply IHT2.
     eapply T_App. eauto.
     eapply LR_typable_empty; eauto.
-    apply ST_App1. apply E.
+    apply ST_App. apply E.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
@@ -126,7 +107,7 @@ Proof.
     clear Hsnf' Hd Hty Hty'.
     destruct Hsnf as [Hms _].
     split; [|intros [x contra]; inversion contra].
-    inversion Hms; subst; eauto.
+    eapply multi_step; eassumption.
 Qed.
 
 Lemma step'_preserves_LR' : forall T cfg t t1' t2',
@@ -134,7 +115,7 @@ Lemma step'_preserves_LR' : forall T cfg t t1' t2',
   (step' t1' t2') ->
   LR cfg T t t2' -> LR cfg T t t1'.
 Proof.
- induction T;  intros cfg t t1' t2' HT E Rt; unfold R; fold R; unfold R in Rt; fold R in Rt;
+ induction T;  intros cfg t t1' t2' HT E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
   - split; [|split].
@@ -145,7 +126,7 @@ Proof.
     eapply IHT2.
     eapply T_App'. eauto.
     eapply LR_typable_empty; eauto.
-    apply ST_App1'. apply E.
+    apply ST_App'. apply E.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
@@ -154,7 +135,7 @@ Proof.
     clear Hsnf Hd Hty Hty'.
     destruct Hsnf' as [Hms' _].
     split; [|intros [x contra]; inversion contra].
-    inversion Hms'; subst; eauto.
+    eapply multi_step; eassumption.
 Qed.
 
 Lemma mstep_preserves_LR': forall T cfg t1 t2 t',
@@ -257,11 +238,10 @@ Require Import Environments.
 
 Inductive instantiation : feat_config -> tass -> env -> env' -> Prop :=
   | V_nil : forall cfg, instantiation cfg nil nil nil
-  | V_cons : forall cfg x T v v' c e e',
+  | V_cons : forall cfg x T t t' c e e',
     instantiation cfg c e e'->
-    value v -> value' v' ->
-    LR cfg T v v' ->
-    instantiation cfg ((x,T)::c) ((x,v)::e) ((x,v')::e').
+    LR cfg T t t' ->
+    instantiation cfg ((x,T)::c) ((x,t)::e) ((x,t')::e').
 
 Lemma instantiation_domains_match: forall {cfg} {c} {e} {e'},
   instantiation cfg c e e'->
@@ -285,7 +265,7 @@ Lemma instantiation_LR : forall cfg c e e',
     LR cfg T t t'.
 Proof.
   intros cfg c e e' V.
-  induction V; intros x0 t t' T0 Hc He He'.
+  induction V; intros x0 t1 t1' T0 Hc He He'.
   - solve_by_inverts 1.
   - simpl in Hc, He, He'.
     destruct (eqb x x0).
@@ -323,10 +303,10 @@ Lemma msubst_preserves_typing : forall cfg c e e',
 Proof.
     intros cfg c e e' H. induction H; intros.
     simpl in H. simpl. auto.
-    simpl in H3.  simpl.
+    simpl in H1.  simpl.
     apply IHinstantiation.
     eapply substitution_preserves_typing; eauto.
-    apply (LR_typable_empty H2).
+    apply (LR_typable_empty H0).
 Qed.
 
 Fixpoint lift_tass (c:tass) : tass' :=
@@ -351,11 +331,11 @@ Lemma msubst'_preserves_typing : forall cfg c e e',
 Proof.
     intros cfg c e e' H. induction H; intros.
     simpl in H. simpl. auto.
-    simpl in H2. simpl.
+    simpl in H0. simpl.
     apply IHinstantiation.
-    simpl in H3.
+    simpl in H1.
     eapply substitution_preserves_typing'; eauto.
-    apply (LR_typable_empty H2).
+    apply (LR_typable_empty H0).
 Qed.
 
 Lemma instantiation_drop : forall cfg c env env',
@@ -425,34 +405,28 @@ Proof.
         simpl. destruct a. simpl.
         unfold update, t_update.
         destruct (String.eqb s x0); auto. }
-      split; [|split]; auto.
-      intros.
-      destruct (LR_halts H0) as [ [v [P Q] ] [v' [P' Q'] ] ].
-      pose proof (mstep_mstep'__preserves_LR _ _ _ _ _ _ P P' H0).
-      apply mstep_mstep'__preserves_LR' with (msubst ((x,v)::env0) t) (msubst' ((x,v')::env0') (lift t)).
+     split; [|split]; auto.
+     intros. specialize IHHT with (c:=((x,T2)::c)).
+     assert (forall x0 : string, (x) |-> T2; Gamma x0 = lookup x0 ((x, T2) :: c)).
+     { intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto. }
+     eapply IHHT in H1.
+     apply mstep_mstep'__preserves_LR' with (msubst ((x,arg)::env0) t) (msubst' ((x,arg')::env0') (lift t)).
       { eapply T_App; eauto.
         eapply LR_typable_empty; eauto. }
       { eapply T_App'; eauto.
         eapply LR_typable_empty; eauto. }
-      { eapply multi_step_trans. eapply multistep_App2; eauto.
-            eapply multi_step with (y:= (msubst ((x, v) :: env0) t));
-              [|apply multi_refl].
-            simpl.  rewrite subst_msubst.
-            eapply ST_AppAbs; eauto.
-            eapply typable_empty__closed.
-            apply (LR_typable_empty H1).
+      { eapply multi_step. apply ST_AppAbs.
+        simpl. rewrite subst_msubst. apply multi_refl.
+          eapply typable_empty__closed.
+            apply (LR_typable_empty H0).
             eapply instantiation_env_closed; eauto. }
-      { eapply multi_step'_trans. eapply multistep'_App2'; eauto.
-            eapply multi_step with (y:= (msubst' ((x, v') :: env0') (lift t)));
-              [|apply multi_refl].
-            simpl.  rewrite subst'_msubst'.
-            eapply ST_AppAbs'; eauto.
-            eapply typable_empty__closed'.
-            apply (LR_typable_empty H1).
-            eapply instantiation_env_closed; eauto.  }
-      eapply (IHHT ((x,T2)::c)).
-        intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto.
-      constructor; auto.
+      { eapply multi_step. apply ST_AppAbs'.
+        simpl. rewrite subst'_msubst'. apply multi_refl.
+        eapply typable_empty__closed'.
+        apply (LR_typable_empty H0).
+        eapply instantiation_env_closed; eauto.  }
+        eassumption.
+        constructor; auto.
   - (* T_App *)
     rewrite msubst_app, msubst'_app'.
     pose proof (IHHT1 c H env0 env0' V).

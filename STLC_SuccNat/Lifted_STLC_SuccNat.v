@@ -48,16 +48,11 @@ Fixpoint subst' (x:string) (s' t': tm'): tm' :=
   end.
 
 Inductive step': tm' -> tm' -> Prop :=
-  | ST_App1': forall t1' t1'' t2',
+  | ST_App': forall t1' t1'' t2',
     step' t1' t1'' ->
       step' (app' t1' t2') (app' t1'' t2')
-  | ST_App2': forall v' t2' t2'',
-    value' v' ->
-    step' t2' t2'' ->
-      step' (app' v' t2') (app' v' t2'')
   | ST_AppAbs': forall x T' t' v',
-    value' v' ->
-      step' (app' (abs' x T' t') v') (subst' x v' t')
+    step' (app' (abs' x T' t') v') (subst' x v' t')
   | ST_Succ': forall t' t'',
     step' t' t'' ->
       step' (succ' t') (succ' t'')
@@ -144,8 +139,10 @@ Proof.
     try (left; constructor).
   - inversion H.
   - right. destruct IHHt1;
-    destruct IHHt2; unfold_exists; eauto using ST_App1', ST_App2'.
-    eapply canonical_forms_fun' in Ht1 as [x [u' Ht1'] ]; subst;
+    destruct IHHt2; unfold_exists; eauto using ST_App', ST_AppAbs'.
+    + eapply canonical_forms_fun' in Ht1 as [x [u' Ht1'] ]; subst;
+      eauto; eexists; econstructor; assumption.
+    + eapply canonical_forms_fun' in Ht1 as [x0 [u' Ht1'] ]; subst;
       eauto; eexists; econstructor; assumption.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat' in H as [n' H]; subst; eauto.
@@ -184,6 +181,7 @@ Proof.
   induction Ht; intros ts' H0;
     inversion H0; subst;
       try (econstructor; eauto).
+  inversion Ht1; subst.
   apply (T_App' _ _ _ _ _ Ht1) in Ht2.
   eapply substitution_preserves_typing';
     inversion Ht2; inversion H4; subst;
@@ -412,15 +410,10 @@ Proof.
     try solve_by_inverts 2.
   - inversion Hstep; subst.
     + apply IHt1_1 in H2.
-      apply ST_App1'.
+      apply ST_App'.
       assumption.
-    + apply IHt1_2 in H3.
-      apply ST_App2';
-        try (apply value_value' in H1);
-        assumption.
     + rewrite lift_subst_subst'_lift.
       apply ST_AppAbs'.
-      apply value_value'; assumption.
   - inversion Hstep; subst.
     + apply IHt1 in H0.
       apply ST_Succ'; assumption.
@@ -437,15 +430,6 @@ Proof.
   - eapply multi_step with (y:= (lift y)).
     + apply step_step'. apply H.
     + exact IHHmulti.
-Qed.
-
-Lemma multistep'_App2' : forall v' t' t1',
-  value' v' -> (multi step' t' t1') -> multi step' (app' v' t') (app' v' t1').
-Proof.
-  intros v t t' V STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_App2'; eauto.  auto.
 Qed.
 
 Lemma multistep'_succ' : forall t' t1',

@@ -36,15 +36,11 @@ Check [ "t" := const 1 ] (abs "t" Nat (succ (var "t"))). *)
 
 
 Inductive step : tm -> tm -> Prop :=
-  | ST_App1: forall t1 t1' t2,
+  | ST_App: forall t1 t1' t2,
     step t1 t1' ->
       step (app t1 t2) (app t1' t2)
-  | ST_App2: forall v t2 t2',
-    value v -> step t2 t2' ->
-      step (app v t2) (app v t2')
-  | ST_AppAbs: forall x T t v,
-    value v ->
-      step (app (abs x T t) v) (subst x v t)
+  | ST_AppAbs: forall x T t1 t2,
+    step (app (abs x T t1) t2) (subst x t2 t1)
 
   | ST_Succ: forall t1 t1',
     step t1 t1' ->
@@ -144,8 +140,10 @@ Proof.
     try (left; constructor).
   - inversion H.
   - right. destruct IHHt1;
-    destruct IHHt2; unfold_exists; eauto using ST_App1, ST_App2.
+    destruct IHHt2; unfold_exists; eauto using ST_App, ST_AppAbs.
     + eapply canonical_forms_fun in Ht1 as [x [u Ht1]]; subst;
+      eauto; eexists; econstructor; assumption.
+    + eapply canonical_forms_fun in Ht1 as [x0 [u Ht1]]; subst;
       eauto; eexists; econstructor; assumption.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat in H as [n H]; subst; eauto.
@@ -220,10 +218,12 @@ Proof.
   induction Ht; intros t' H0;
     inversion H0; subst;
       try (econstructor; eauto).
+  inversion Ht1; subst.
   apply (T_App _ _ _ _ _ Ht1) in Ht2.
-  eapply substitution_preserves_typing;
-    inversion Ht2; inversion H4; subst;
+  eapply substitution_preserves_typing.
     eassumption.
+    inversion Ht2; inversion H4; subst;
+    try eassumption.
 Qed.
 
 Lemma preservation_multi: forall t t' T,
@@ -282,15 +282,6 @@ Proof.
     eapply multi_step.
     + exact H.
     + exact H23.
-Qed.
-
-Lemma multistep_App2 : forall v t t',
-  value v -> (multi step t t') -> multi step (app v t) (app v t').
-Proof.
-  intros v t t' V STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_App2; eauto.  auto.
 Qed.
 
 Lemma multistep_succ : forall t t',

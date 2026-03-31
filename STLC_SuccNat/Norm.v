@@ -135,7 +135,7 @@ Proof.
   split. apply (step_preserves_halting _ _ E); eauto.
   intros.
   eapply IHT2.
-  apply  ST_App1. apply E.
+  apply  ST_App. apply E.
   apply RRt; auto.
   (* Nat *)
   split. eapply preservation; eauto.
@@ -163,7 +163,7 @@ Proof.
   eapply IHT2.
   eapply T_App; eauto.
   apply R_typable_empty; auto.
-  eapply ST_App1. apply E.
+  eapply ST_App. apply E.
   apply RRt; auto.
   (* Nat *)
   split. auto.
@@ -291,10 +291,10 @@ Qed.
 
 Inductive instantiation : tass -> env -> Prop :=
   | V_nil : instantiation nil nil
-  | V_cons : forall x T v c e,
-      value v -> R T v ->
+  | V_cons : forall x T t c e,
+      R T t ->
       instantiation c e ->
-      instantiation ((x,T)::c) ((x,v)::e).
+      instantiation ((x,T)::c) ((x,t)::e).
 
 Lemma instantiation_domains_match: forall {c} {e},
   instantiation c e ->
@@ -362,10 +362,10 @@ Lemma msubst_preserves_typing : forall c e,
 Proof.
     intros c e H. induction H; intros.
     simpl in H. simpl. auto.
-    simpl in H2.  simpl.
+    simpl in H1.  simpl.
     apply IHinstantiation.
     eapply substitution_preserves_typing; eauto.
-    apply (R_typable_empty H0).
+    apply (R_typable_empty H).
 Qed.
 
 Lemma msubst_R : forall c env t T,
@@ -404,21 +404,19 @@ Proof.
         unfold R. fold R. split.
            auto.
          split. apply value_halts. apply v_abs.
-         intros.
-         destruct (R_halts H0) as [v [P Q] ].
-         pose proof (multistep_preserves_R _ _ _ P H0).
-         apply multistep_preserves_R' with (msubst ((x,v)::env0) t).
+         intros. specialize IHHT with (c:=((x,T2)::c)).
+         assert (forall x0 : string, (x) |-> T2; Gamma x0 = lookup x0 ((x, T2) :: c)).
+         { intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto. }
+         eapply IHHT in H1.
+         apply multistep_preserves_R' with (msubst ((x,s)::env0) t).
             eapply T_App. eauto.
             apply R_typable_empty; auto.
-            eapply multi_step_trans. eapply multistep_App2; eauto.
-            eapply multi_step with (y:= (msubst ((x, v) :: env0) t)); [|apply multi_refl].
-            simpl.  rewrite subst_msubst.
-            eapply ST_AppAbs; eauto.
+            eapply multi_step. apply ST_AppAbs.
+            simpl.  rewrite subst_msubst. apply multi_refl.
             eapply typable_empty__closed.
-            apply (R_typable_empty H1).
+            apply (R_typable_empty H0).
             eapply instantiation_env_closed; eauto.
-            eapply (IHHT ((x,T2)::c)).
-               intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto.
+            eassumption.
             constructor; auto.
   - (* T_App *)
     rewrite msubst_app.
