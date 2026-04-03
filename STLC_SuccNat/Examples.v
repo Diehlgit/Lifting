@@ -99,13 +99,6 @@ Definition y' := [
 
 Definition z' := [ (19, pc_True) ].
 
-Ltac solve_by_inverts n :=
-	match goal with | H : ?T  |-  _  =>
-	match type of T with Prop =>
-		solve [ inversion H;
-		match n with S (S (?n')) =>
-			subst; solve_by_inverts (S n') end ]
-	end end.
 
 (* plusone(x'|p) = (plusone'(x'))|p *)
 Example comm_plusone_x': forall (cfg:feat_config) (x n:nat) (n':nat'),
@@ -334,7 +327,8 @@ Fixpoint gen_plusn' (n:nat) (t':tm') : tm' :=
 
 Definition plusn (n:nat) : tm := abs "n" Nat (gen_plusn n (var "n")).
 
-(* Compute subst "n" (const 0) (gen_plusn 1 (var "n")).
+
+(* Compute (subst "n" (const 0) (gen_plusn 1 (var "n"))).
 Compute plusn 0.
  *)
 
@@ -452,7 +446,7 @@ Proof.
   exact Hd.
 Qed.
 
-Require Import Norm Lifted_Norm LR.
+Require Import Derivation Norm Lifted_Norm LR.
 
 (* LR examples *)
 
@@ -462,17 +456,26 @@ Proof.
   split; [|split]; simpl; eauto.
   intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
   split; [eauto|split]; eauto.
-  eexists; eexists.
-  split; [|split].
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step_trans.
+  pose proof (derive'_value _ _ _ Hd) as [].
+  eapply preservation_multi in Hty; eauto.
+  eapply preservation'_multi in Hty'; eauto.
+  apply (canonical_forms_nat _ Hty) in H as [n]; subst.
+  apply (canonical_forms_nat' _ Hty') in H0 as [n']; subst.
+  repeat eexists.
+  - eapply multi_step_trans.
       eapply multistep_app2; eauto.
-      normalize.
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step'_trans.
+      eapply multi_step. apply ST_AppAbs; auto.
+      simpl. normalize.
+  - intros [x contra]; inversion contra.
+  - eapply multi_step'_trans.
       eapply multistep'_app2'; eauto.
-      normalize.
-  - eapply mapping_not_change_deriving. assumption.
+      eapply multi_step. apply ST_AppAbs'; auto.
+      simpl. normalize.
+  - intros [x contra]; inversion contra.
+  - simpl. erewrite mapping_not_change_deriving. eauto.
+    simpl in Hd. destruct (derive n' cfg);
+      try solve_by_inverts 1.
+      injection Hd as []; auto.
 Qed.
 
 Example LR_plustwo: forall cfg, LR cfg (Arrow Nat Nat) plustwo (lift plustwo).
@@ -481,62 +484,95 @@ Proof.
   split; [|split]; simpl; eauto.
   intros arg arg' [Hty [Hty' [r [r' [ [Hms _] [ [Hms' _] Hd] ] ] ] ] ].
   split; [eauto|split]; eauto.
-  eexists; eexists.
-  split; [|split].
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step_trans.
+  pose proof (derive'_value _ _ _ Hd) as [].
+  eapply preservation_multi in Hty; eauto.
+  eapply preservation'_multi in Hty'; eauto.
+  apply (canonical_forms_nat _ Hty) in H as [n]; subst.
+  apply (canonical_forms_nat' _ Hty') in H0 as [n']; subst.
+  repeat eexists.
+  - eapply multi_step_trans.
       eapply multistep_app2; eauto.
       eapply multi_step.
       auto. simpl. eapply multi_step.
       auto. eapply multi_step.
       auto. apply multi_refl.
-  - split; [|intros [x contra]; inversion contra].
-    eapply multi_step'_trans.
+  - intros [x contra]; inversion contra.
+  - eapply multi_step'_trans.
       eapply multistep'_app2'; eauto.
       eapply multi_step.
       auto. simpl. eapply multi_step.
       auto. eapply multi_step.
-      auto. apply multi_refl.
-  - eapply mapping_not_change_deriving.
-    eapply mapping_not_change_deriving.
+     auto. apply multi_refl.
+  - intros [x contra]; inversion contra.
+  - simpl. erewrite mapping_not_change_deriving.
+    reflexivity.
+    apply mapping_not_change_deriving.
+    simpl in Hd. destruct (derive n' cfg);
+      try solve_by_inverts 1.
+    injection Hd as []; auto.
+Qed.
+
+Lemma wt_plusn : forall n,
+  has_type empty (plusn n) (Arrow Nat Nat).
+Proof.
+  induction n.
+  - constructor. simpl. auto.
+  - unfold plusn. simpl.
+    inversion IHn; subst.
+    repeat constructor.
+    assumption.
+Qed.
+
+Lemma wt_plusn' : forall n,
+  has_type' empty (lift(plusn n)) (Arrow' Nat' Nat').
+Proof.
+  induction n.
+  - constructor. simpl. auto.
+  - unfold plusn. simpl.
+    inversion IHn; subst.
+    repeat constructor.
     assumption.
 Qed.
 
 Example LR_plusn: forall n cfg, LR cfg (Arrow Nat Nat) (plusn n) (lift (plusn n)).
 Proof.
   intros. unfold LR.
-  split; [|split;
-  [| intros arg arg' [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd] ] ] ] ] ];
-     split; [|split; [|eexists;eexists;split; [|split] ] ]
-  ] ].
+  repeat split;
+  try destruct H as [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd]]]]]].
   - unfold plusn. constructor.
     induction n; simpl; auto.
   - unfold plusn. simpl. constructor.
     induction n; simpl; auto.
-  - unfold plusn. econstructor; eauto.
-    induction n; simpl; auto.
-    constructor. constructor.
-    inversion IHn; subst. auto.
-  - unfold plusn. simpl.
-    econstructor; eauto.
-    induction n; simpl; auto.
-    constructor; constructor.
-    inversion IHn; subst. auto.
+  - econstructor; try eassumption.
+    apply wt_plusn.
+  - econstructor; try eassumption.
+    apply wt_plusn'.
   - assert (Hms: multi step (app (plusn n) arg) (app (plusn n) r)).
     { eapply multistep_app2.
       induction n; unfold plusn; auto.
       destruct Hsnf. assumption. }
-    pose proof (normal_form_plusn n r) as [Hms0 _].
-    pose proof (multi_step_trans _ _ _ Hms Hms0).
-    split; [|intros [x contra]; inversion contra].
-    eassumption.
-  - assert (Hms': multi step' (app' (lift (plusn n)) arg') (app' (lift (plusn n)) (const' r'))).
+    assert (Hms': multi step' (app' (lift (plusn n)) arg') (app' (lift (plusn n)) r')).
     { eapply multistep'_app2'.
       induction n; unfold plusn; simpl; auto.
       destruct Hsnf'. assumption. }
-    pose proof (normal_form'_lift_plusn n r') as [Hms0' _].
-    pose proof (multi_step'_trans _ _ _ Hms' Hms0').
-    split; [|intros [x contra]; inversion contra].
-    eassumption.
-  - apply mapping_not_change_deriving. assumption.
+    pose proof (derive'_value _ _ _ Hd) as [].
+    eapply preservation_multi in Hty; [|destruct Hsnf; eassumption].
+    eapply preservation'_multi in Hty'; [|destruct Hsnf'; eassumption].
+    apply (canonical_forms_nat _ Hty) in H as [k]; subst.
+    apply (canonical_forms_nat' _ Hty') in H0 as [k']; subst.
+    pose proof (normal_form_plusn n k) as [Hms0 _].
+    pose proof (normal_form'_lift_plusn n k') as [Hms0' _].
+    apply (multi_step_trans _ _ _ Hms) in Hms0.
+    apply (multi_step'_trans _ _ _ Hms') in Hms0'.
+    clear Hms Hms' Hsnf Hsnf'.
+    repeat eexists.
+    exact Hms0.
+    intros [x contra]; inversion contra.
+    exact Hms0'.
+    intros [x contra]; inversion contra.
+    simpl. erewrite mapping_not_change_deriving.
+    reflexivity.
+    simpl in Hd. destruct (derive k' cfg);
+      try solve_by_inverts 1.
+    injection Hd as []; auto.
 Qed.
