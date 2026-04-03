@@ -1,7 +1,7 @@
 Require Import String List Maps.
 Import ListNotations.
 Require Import STLC_SuccNat.
-Require Import Lifted_STLC_SuccNat.
+Require Import Presence_Conditions Lifted_STLC_SuccNat.
 Require Import Environments.
 
 Hint Constructors multi : core.
@@ -33,10 +33,11 @@ Inductive appears_free_in' : string -> tm' -> Prop :=
       appears_free_in' x (abs' y T11' t12')
   (* nats*)
   |afi_succ' : forall x t1', appears_free_in' x t1' -> appears_free_in' x (succ' t1')
+  |afi_add1' : forall x t1' t2', appears_free_in' x t1' -> appears_free_in' x (add' t1' t2')
+  |afi_add2' : forall x t1' t2', appears_free_in' x t2' -> appears_free_in' x (add' t1' t2')
   (* lists *)
   |afi_cons1' : forall x t1' t2', appears_free_in' x t1' -> appears_free_in' x (cons' t1' t2')
   |afi_cons2' : forall x t1' t2', appears_free_in' x t2' -> appears_free_in' x (cons' t1' t2')
-  
   |afi_case1' : forall x y z t1' tnil' tcons',
     appears_free_in' x t1' -> appears_free_in' x (case' t1' tnil' y z tcons')
   |afi_case2' : forall x y z t1' tnil' tcons',
@@ -240,8 +241,13 @@ Proof with eauto.
     reflexivity.
     intros H; eauto.
     intros H; eauto.
-   - (* Succ' *)
+ - (* Succ' *)
     rewrite IHt'...
+ - (* Add' *)
+    rewrite IHt'1, IHt'2.
+    reflexivity.
+    intros H; eauto.
+    intros H; eauto.
   - (* Cons' *)
     rewrite IHt'1, IHt'2...
   - (* Case' *)
@@ -288,6 +294,8 @@ Proof with eauto.  (* rather slow this way *)
      inversion A.
     - (* succ' *)
      inversion A; subst...
+    - (* add' *)
+     inversion A; subst...
     - (* nil' *)
      inversion A; subst...
     - (* cons' *)
@@ -329,6 +337,8 @@ Proof with eauto.
    reflexivity.
   - (* succ' *)
    rewrite IHt'...
+  - (* add' *)
+   rewrite IHt'1, IHt'2...
   - (* nil' *)
    reflexivity.
   - (* cons' *)
@@ -508,6 +518,29 @@ Proof.
       eauto.
       apply (canonical_forms_nat' v A) in Hv as [n Hv].
       rewrite Hv. exists (const' (map (fun '(n0,pc) => (S (n0),pc)) n)); eauto.
+      auto.
+  - (* T_Add' *)
+    rewrite msubst'_add'.
+    apply (IHHT1 c H env0') in V as IH1.
+    apply (IHHT2 c H env0') in V as IH2.
+    clear IHHT1 IHHT2.
+    destruct (R'_halts' IH1) as [v1' [Hm1' Hv1']].
+    destruct (R'_halts' IH2) as [v2' [Hm2' Hv2']].
+    eapply multistep'_preserves_R1'.
+      eauto using R'_typable_empty.
+      eapply multi_step'_trans.
+      eapply multistep'_add1'. exact Hm1'.
+      eapply multistep'_add2'; eassumption.
+    eapply (multistep'_preserves_R' _ _ _ Hm1') in IH1
+      as [A1 [B1 _]].
+    eapply (multistep'_preserves_R' _ _ _ Hm2') in IH2
+      as [A2 [B2 _]].
+    split; [|split].
+      eauto.
+      apply (canonical_forms_nat' v1' A1) in Hv1' as [n1' Hv1'].
+      apply (canonical_forms_nat' v2' A2) in Hv2' as [n2' Hv2'].
+      rewrite Hv1', Hv2'. exists (const' (app_binop Nat.add n1' n2')).
+      split. econstructor. apply ST_AddConst'. apply multi_refl. auto.
       auto.
   - (* T_Nil' *)
     rewrite msubst'_nil'.

@@ -21,8 +21,6 @@ Graphs/
 *.png
 *.txt
 
-# Ignore Coq project configuration
-_CoqProject
 *.cache
 
 # Ignore local Makefile config

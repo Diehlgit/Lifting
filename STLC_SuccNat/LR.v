@@ -638,6 +638,48 @@ Proof.
       auto. destruct (derive n' cfg) eqn:Heq;
       try solve_by_inverts 1.
       injection Hd as Hd; auto.
+  - (* T_Add *)
+    rewrite msubst_add, msubst'_add'.
+    destruct (IHHT1 c H env0 env0' V) as [HT11 [HT1' [r1 [r1' [[Hms1 _] [[Hms1' _] Hd1]]]]]].
+    destruct (IHHT2 c H env0 env0' V) as [HT22 [HT2' [r2 [r2' [[Hms2 _] [[Hms2' _] Hd2]]]]]].
+    split; [|split]; auto.
+    pose proof (preservation_multi _ _ _ HT11 Hms1).
+    pose proof (preservation'_multi _ _ _ HT1' Hms1').
+    pose proof (derive'_value _ _ _ Hd1) as [].
+    apply (canonical_forms_nat _ H0) in H2 as [n1]; subst.
+    apply (canonical_forms_nat' _ H1) in H3 as [n1']; subst.
+    clear H0 H1.
+    pose proof (preservation_multi _ _ _ HT22 Hms2).
+    pose proof (derive'_value _ _ _ Hd2) as [].
+    pose proof (preservation'_multi _ _ _ HT2' Hms2').
+    apply (canonical_forms_nat _ H0) in H1 as [n2]; subst.
+    apply (canonical_forms_nat' _ H3) in H2 as [n2']; subst.
+    clear H0 H3.
+    exists (const (n1 + n2)), (const' (app_binop Nat.add n1' n2'));
+    repeat split.
+    + eapply multi_step_trans.
+      apply multistep_add1; eassumption.
+      eapply multi_step_trans.
+      apply multistep_add2; eauto.
+      eapply multi_step. apply ST_AddConst.
+      apply multi_refl.
+    + intros [x contra]; inversion contra.
+    + eapply multi_step'_trans.
+      apply multistep'_add1'; eassumption.
+      eapply multi_step'_trans.
+      apply multistep'_add2'; eauto.
+      eapply multi_step. apply ST_AddConst'.
+      apply multi_refl.
+    + intros [x contra]; inversion contra.
+    + simpl.
+      erewrite binop_not_change_deriving.
+      reflexivity.
+      simpl in Hd1. destruct (derive n1' cfg);
+      try solve_by_inverts 1.
+      injection Hd1 as []; auto.
+      simpl in Hd2. destruct (derive n2' cfg);
+      try solve_by_inverts 1.
+      injection Hd2 as []; auto.
   - (* T_Nil *)
     split; [|split].
     rewrite msubst_nil. auto.
@@ -752,95 +794,86 @@ Proof.
         destruct a. simpl. unfold update, t_update.
         destruct (String.eqb s x0); auto. }
 
-(*      destruct T; (simpl;
-      split;[|split]); auto.*)
       pose proof (IHHT1 c H env0 env0' V).
       unfold LR in H0. destruct H0 as [_ [_ [v1 [v1' [Hsnf [Hsnf' Hdv1]]]]]].
       inversion Hty; inversion Hty'; subst.
       pose proof (wt_nf_is_value _ _ _ H7 Hsnf); clear H8 H9.
       pose proof (wt_nf_is_value' _ _ _ H17 Hsnf'); clear H18 H19.
-(*      intros arg arg' H2.*)
       destruct Hsnf as [Hms _]. destruct Hsnf' as [Hms' _].
       eapply mstep_mstep'__preserves_LR'.
-        exact Hty. exact Hty'.
-        eapply multistep_case1; eassumption.
-        eapply multistep'_case1'; eassumption.
-(*        econstructor; eauto;
-        try (apply LR_typable_empty in H2 as []; auto).
-        econstructor; eauto;
-        try (apply LR_typable_empty in H2 as []; auto).
-        eapply multistep_app1, multistep_case1; eassumption.
-        eapply multistep'_app1', multistep'_case1'; eassumption.*)
-        pose proof (preservation_multi _ _ _ H7 Hms).
-        pose proof (preservation'_multi _ _ _ H17 Hms').
-        clear H7 H17.
+      exact Hty. exact Hty'.
+      eapply multistep_case1; eassumption.
+      eapply multistep'_case1'; eassumption.
+      pose proof (preservation_multi _ _ _ H7 Hms).
+      pose proof (preservation'_multi _ _ _ H17 Hms').
+      clear H7 H17.
 
-        pose proof (related_canonical_forms_list v1 v1' H2 H3 H0 H1).
-        destruct H4. exists cfg; auto. clear H2 H3.
-        (* Case Nil *)
-        { destruct H4; subst. clear H0 H1 Hdv1 Hms Hms'.
-          eapply mstep_mstep'__preserves_LR'.
-          inversion Hty; subst.
-          constructor; eauto.
-          inversion Hty'; subst.
-          constructor; eauto.
-          eapply multi_step.
-          apply ST_CaseNil.
-          apply multi_refl.
-          eapply multi_step.
-          apply ST_CaseNil'.
-          apply multi_refl.
-          eapply IHHT2; auto. }
-        (* Case Cons *)
-        { destruct H4 as [v2 [v3 [v2' [v3' [Hv2' [Hv3' [Hv2 [Hv3 [Heq Heq']]]]]]]]].
-          subst. eapply mstep_mstep'__preserves_LR'.
-          inversion Hty; subst.
-          constructor; eauto.
-          inversion Hty'; subst.
-          constructor; eauto.
-          eapply multi_step.
-          apply ST_CaseCons; auto.
-          apply multi_refl.
-          eapply multi_step.
-          apply ST_CaseCons'; auto.
-          apply multi_refl.
-          rewrite drop_comm.
-          repeat rewrite <- subst_msubst.
-          repeat rewrite msubst_subst.
-          rewrite drop_comm.
-          repeat rewrite <- subst'_msubst'.
-          repeat rewrite msubst'_subst'.
-          apply IHHT3 with (c:= ((x,Nat) :: (y, NatList) :: c)).
-          - intros s. unfold update, t_update, lookup.
-            destruct (String.eqb x s); auto;
-            destruct (String.eqb y s); auto.
-          - repeat constructor; auto.
-            inversion H2; subst; auto.
-            inversion H3; subst; auto.
-            apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
-            exists v3, v3'. repeat split; auto.
-            apply value_is_nf; auto.
-            apply value'_is_nf; auto.
-            inversion H2; subst; auto.
-            inversion H3; subst; auto.
-            apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
-            exists v2, v2'. repeat split; auto.
-            apply value_is_nf; auto.
-            apply value'_is_nf; auto.
-          - eapply typable_empty__closed'.
-            inversion H3; subst; eauto.
-          - eapply instantiation_env_closed. eassumption.
-          - eapply typable_empty__closed'.
-            inversion H3; subst; eauto.
-          - eapply instantiation_env_closed.
-            eapply instantiation_drop. eassumption.
-          - eapply typable_empty__closed.
-            inversion H2; subst; eauto.
-          - eapply instantiation_env_closed. eassumption.
-          - eapply typable_empty__closed.
-            inversion H2; subst; eauto.
-          - eapply instantiation_env_closed.
-            eapply instantiation_drop. eassumption. }
+      pose proof (related_canonical_forms_list v1 v1' H2 H3 H0 H1).
+      destruct H4. exists cfg; auto. clear H2 H3.
+      (* Case Nil *)
+      { destruct H4; subst. clear H0 H1 Hdv1 Hms Hms'.
+        eapply mstep_mstep'__preserves_LR'.
+        inversion Hty; subst.
+        constructor; eauto.
+        inversion Hty'; subst.
+        constructor; eauto.
+        eapply multi_step.
+        apply ST_CaseNil.
+        apply multi_refl.
+        eapply multi_step.
+        apply ST_CaseNil'.
+        apply multi_refl.
+        eapply IHHT2; auto. }
+      (* Case Cons *)
+      { destruct H4 as [v2 [v3 [v2' [v3' [Hv2' [Hv3' [Hv2 [Hv3 [Heq Heq']]]]]]]]].
+        subst. eapply mstep_mstep'__preserves_LR'.
+        inversion Hty; subst.
+        constructor; eauto.
+        inversion Hty'; subst.
+        constructor; eauto.
+        eapply multi_step.
+        apply ST_CaseCons; auto.
+        apply multi_refl.
+        eapply multi_step.
+        apply ST_CaseCons'; auto.
+        apply multi_refl.
+        rewrite drop_comm.
+        repeat rewrite <- subst_msubst.
+        repeat rewrite msubst_subst.
+        rewrite drop_comm.
+        repeat rewrite <- subst'_msubst'.
+        repeat rewrite msubst'_subst'.
+        apply IHHT3 with (c:= ((x,Nat) :: (y, NatList) :: c)).
+        - intros s. unfold update, t_update, lookup.
+          destruct (String.eqb x s); auto;
+          destruct (String.eqb y s); auto.
+        - repeat constructor; auto.
+          inversion H2; subst; auto.
+          inversion H3; subst; auto.
+          apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
+          exists v3, v3'. repeat split; auto.
+          apply value_is_nf; auto.
+          apply value'_is_nf; auto.
+          inversion H2; subst; auto.
+          inversion H3; subst; auto.
+          apply simpl_derive'_list in Hdv1 as [Hdv2 Hdv3].
+          exists v2, v2'. repeat split; auto.
+          apply value_is_nf; auto.
+          apply value'_is_nf; auto.
+        - eapply typable_empty__closed'.
+          inversion H3; subst; eauto.
+        - eapply instantiation_env_closed. eassumption.
+        - eapply typable_empty__closed'.
+          inversion H3; subst; eauto.
+        - eapply instantiation_env_closed.
+          eapply instantiation_drop. eassumption.
+        - eapply typable_empty__closed.
+          inversion H2; subst; eauto.
+        - eapply instantiation_env_closed. eassumption.
+        - eapply typable_empty__closed.
+          inversion H2; subst; eauto.
+        - eapply instantiation_env_closed.
+          eapply instantiation_drop. eassumption. }
 Qed.
 
 Theorem commutativity: forall T cfg analysis,

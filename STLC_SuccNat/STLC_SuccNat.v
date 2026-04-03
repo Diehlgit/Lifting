@@ -15,11 +15,12 @@ Inductive tm : Type :=
 
   | const : nat -> tm
   | succ : tm -> tm
+  | add : tm -> tm -> tm
 
   | nil :  tm
   | cons : tm -> tm -> tm
-  | case : tm -> tm -> string -> string -> tm -> tm.
-  (* i.e., case t1 of | nil ⇒ t2 | x::y ⇒ t3 *)
+  | case : tm -> tm -> string -> string -> tm -> tm
+  (* i.e., case t1 of | nil ⇒ t2 | x::y ⇒ t3 *).
 
 Inductive value : tm -> Prop :=
   | v_abs : forall x T t, value (abs x T t)
@@ -37,6 +38,7 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
 
   | const _ => t
   | succ t1 => succ (subst x s t1)
+  | add t1 t2 => add (subst x s t1) (subst x s t2)
 
   | nil => nil
   | cons t1 t2 => cons (subst x s t1) (subst x s t2)
@@ -64,6 +66,16 @@ Inductive step : tm -> tm -> Prop :=
       step (succ t1) (succ t2)
   | ST_SuccConst : forall (n : nat),
     step (succ (const n)) (const (S n))
+
+  | ST_Add1: forall t1 t1' t2,
+    step t1 t1' ->
+      step (add t1 t2) (add t1' t2)
+  | ST_Add2: forall v1 t2 t2',
+    value v1 ->
+    step t2 t2' ->
+      step (add v1 t2) (add v1 t2')
+  | ST_AddConst: forall (n1 n2 : nat),
+    step (add (const n1) (const n2)) (const (n1 + n2))
 
   | ST_Cons1: forall t1 t2 t3,
     step t1 t2 ->
@@ -115,6 +127,10 @@ Inductive has_type : context -> tm -> ty -> Prop :=
     has_type Gamma (const n) Nat
   | T_Succ : forall Gamma t,
     has_type Gamma t Nat -> has_type Gamma (succ t) Nat
+  | T_Add : forall Gamma t1 t2,
+    has_type Gamma t1 Nat ->
+    has_type Gamma t2 Nat ->
+    has_type Gamma (add t1 t2) Nat
 
   | T_Nil : forall Gamma,
     has_type Gamma nil NatList
@@ -218,6 +234,16 @@ Proof.
     + eapply canonical_forms_nat in H as [n H]; subst; eauto.
       eexists. apply ST_SuccConst.
     + destruct H; eexists; eapply ST_Succ; eauto.
+  - right. destruct IHHt2, IHHt1; eauto.
+    + eapply canonical_forms_nat in H as [n2 H2];
+      eapply canonical_forms_nat in H0 as [n1 H1];
+      subst; eauto. eexists. apply ST_AddConst.
+    + destruct H0; eexists;
+      eapply ST_Add1; eassumption.
+    + destruct H; eexists;
+      eapply ST_Add2; eassumption.
+    + destruct H0; eexists;
+      eapply ST_Add1; eassumption.
   - left; constructor.
   - destruct IHHt1; auto.
     + destruct IHHt2; auto.
@@ -451,4 +477,23 @@ Proof.
     apply multi_refl.
     eapply multi_step.
       apply ST_Case1; eauto. auto.
+Qed.
+
+Lemma multistep_add1 : forall t1 t1' t2,
+  multi step t1 t1' -> multi step (add t1 t2) (add t1' t2).
+Proof.
+  intros t1 t1' t2 STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_Add1; eauto.  auto.
+Qed.
+
+Lemma multistep_add2 : forall v1 t2 t2',
+  value v1 -> multi step t2 t2' ->
+    multi step (add v1 t2) (add v1 t2').
+Proof.
+  intros v1 t2 t2' Hv STM. induction STM.
+   apply multi_refl.
+   eapply multi_step.
+     apply ST_Add2; eauto.  auto.
 Qed.

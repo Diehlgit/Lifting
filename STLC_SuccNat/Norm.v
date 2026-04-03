@@ -32,6 +32,8 @@ Inductive appears_free_in : string -> tm -> Prop :=
       appears_free_in x (abs y T11 t12)
   (* nats*)
   |afi_succ : forall x t1, appears_free_in x t1 -> appears_free_in x (succ t1)
+  |afi_add1 : forall x t1 t2, appears_free_in x t1 -> appears_free_in x (add t1 t2)
+  |afi_add2 : forall x t1 t2, appears_free_in x t2 -> appears_free_in x (add t1 t2)
   (* lists *)
   |afi_cons1 : forall x t1 t2, appears_free_in x t1 -> appears_free_in x (cons t1 t2)
   |afi_cons2 : forall x t1 t2, appears_free_in x t2 -> appears_free_in x (cons t1 t2)
@@ -248,6 +250,11 @@ Proof with eauto.
     apply afi_abs...
   - (* Succ *)
     rewrite IHt...
+  - (* Add *)
+    rewrite IHt1, IHt2.
+    reflexivity.
+    intros H; eauto.
+    intros H; eauto.
   - (* Cons *)
     rewrite IHt1, IHt2...
   - (* Case *)
@@ -294,6 +301,8 @@ Proof with eauto.  (* rather slow this way *)
      inversion A.
     - (* succ *)
      inversion A; subst...
+    - (* add *)
+     inversion A; subst...
     - (* nil *)
      inversion A; subst...
     - (* cons *)
@@ -335,6 +344,8 @@ Proof with eauto.
    reflexivity.
   - (* succ *)
    rewrite IHt...
+  - (* add *)
+    rewrite IHt1, IHt2...
   - (* nil *)
    reflexivity.
   - (* cons *)
@@ -514,6 +525,29 @@ Proof.
       eauto.
       apply (canonical_forms_nat v A) in Hv as [n Hv].
       rewrite Hv. exists (const (S n)); eauto.
+      auto.
+  - (* T_Add *)
+    rewrite msubst_add.
+    apply (IHHT1 c H env0) in V as IH1.
+    apply (IHHT2 c H env0) in V as IH2.
+    clear IHHT1 IHHT2.
+    destruct (R_halts IH1) as [v1 [Hm1 Hv1]].
+    destruct (R_halts IH2) as [v2 [Hm2 Hv2]].
+    eapply multistep_preserves_R'.
+      eauto using R_typable_empty.
+      eapply multi_step_trans.
+      eapply multistep_add1. exact Hm1.
+      eapply multistep_add2; eassumption.
+    eapply (multistep_preserves_R _ _ _ Hm1) in IH1
+      as [A1 [B1 _]].
+    eapply (multistep_preserves_R _ _ _ Hm2) in IH2
+      as [A2 [B2 _]].
+    split; [|split].
+      eauto.
+      apply (canonical_forms_nat v1 A1) in Hv1 as [n1 Hv1].
+      apply (canonical_forms_nat v2 A2) in Hv2 as [n2 Hv2].
+      rewrite Hv1, Hv2. exists (const (n1 + n2)).
+      split. econstructor. apply ST_AddConst. apply multi_refl. auto.
       auto.
   - (* T_Nil *)
     rewrite msubst_nil.

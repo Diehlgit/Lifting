@@ -170,6 +170,15 @@ Proof.
     simpl. apply IHss.
 Qed.
 
+Lemma msubst_add : forall ss t1 t2,
+  msubst ss (add t1 t2) = add (msubst ss t1) (msubst ss t2).
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
+
 Lemma msubst_cons : forall ss t1 t2,
   msubst ss (cons t1 t2) = cons (msubst ss t1) (msubst ss t2).
 Proof.
@@ -245,6 +254,15 @@ Proof.
     simpl. apply IHss.
 Qed.
 
+Lemma msubst'_add' : forall ss t1' t2',
+  msubst' ss (add' t1' t2') = add' (msubst' ss t1') (msubst' ss t2').
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+    simpl. apply IHss.
+Qed.
+
 Lemma msubst'_cons' : forall ss t1' t2',
   msubst' ss (cons' t1' t2') = cons' (msubst' ss t1') (msubst' ss t2').
 Proof.
@@ -267,4 +285,3 @@ Proof.
     - destruct (eqb s y);
       simpl; auto.
 Qed.
-
