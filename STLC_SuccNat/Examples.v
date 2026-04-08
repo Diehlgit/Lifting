@@ -583,11 +583,11 @@ Require Import Notations.
 Definition line_count2 : tm :=
   <{ \"t":NatList,
     (case '"t" of
-      | [] => 0
+      | nil => 0
       | "x" :: "xs" => '"x" + (case '"xs" of
-        | [] => 0
+        | nil => 0
         | "x" :: "xs" => '"x" + (case '"xs" of
-          | [] => 0
+          | nil => 0
           | "x" :: "xs" => 0)))}> .
 
 Example line_count2_nf :
@@ -610,6 +610,8 @@ Proof.
   eapply multi_step. apply ST_AddConst.
   simpl. apply multi_refl.
 Qed.
+
+Require Import Presence_Conditions_Notations Lifted_Notations.
 
 Definition _1A0nA : tm' :=
   (cons' (const' [(1,(pc_Feature "A"));(0, (pc_Not (pc_Feature"A")))])

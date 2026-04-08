@@ -10,3 +10,5 @@ Lifted_Norm.v
 LR.v
 Derivation.v
 Notations.v
+Presence_Conditions_Notations.v
+Lifted_Notations.v

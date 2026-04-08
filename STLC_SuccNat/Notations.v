@@ -86,18 +86,18 @@ Check <{ 1 + (2 + 3) }>.                (* add (const 1) (add (const 2) (const 3
 Check <{ succ 1 + 2 }>.              (* add (succ (const 1)) (const 2) : tm *)
 Check <{ succ (1 + 2) }>.            (* succ (add (const 1) (const 2)) : tm *)
 
-Notation "'[]'" := nil (in custom tm at level 0).
+Notation "'nil'" := nil (in custom tm at level 0).
 
 Notation "t1 :: t2" := (cons t1 t2)
   (in custom tm at level 60, right associativity,
    t1 custom tm, t2 custom tm at level 60).
 
-Check <{ [] }>.                          (* nil : tm *)
-Check <{ 1 :: [] }>.                     (* cons (const 1) nil : tm *)
-Check <{ 1 :: 2 :: [] }>.               (* cons (const 1) (cons (const 2) nil) : tm *)
-Check <{ 1 :: 2 :: 3 :: [] }>.          (* cons (const 1) (cons (const 2) (cons (const 3) nil)) : tm *)
-Check <{ succ 1 :: [] }>.             (* cons (succ (const 1)) nil : tm *)
-Check <{ (1 + 2) :: [] }>.              (* cons (add (const 1) (const 2)) nil : tm *)
+Check <{ nil }>.                          (* nil : tm *)
+Check <{ 1 :: nil }>.                     (* cons (const 1) nil : tm *)
+Check <{ 1 :: 2 :: nil }>.               (* cons (const 1) (cons (const 2) nil) : tm *)
+Check <{ 1 :: 2 :: 3 :: nil }>.          (* cons (const 1) (cons (const 2) (cons (const 3) nil)) : tm *)
+Check <{ succ 1 :: nil }>.             (* cons (succ (const 1)) nil : tm *)
+Check <{ (1 + 2) :: nil }>.              (* cons (add (const 1) (const 2)) nil : tm *)
 
 Notation "[ t ]" := (cons t nil)
   (in custom tm at level 0, t custom tm at level 60).
@@ -111,19 +111,20 @@ Check <{ [1] }>.         (* cons (const 1) nil : tm *)
 Check <{ [1 ; 2] }>.     (* cons (const 1) (cons (const 2) nil) : tm *)
 Check <{ [1 ; 2 ; 3] }>. (* cons (const 1) (cons (const 2) (cons (const 3) nil)) : tm *)
 
-Notation "'case' t1 'of' '|' '[]' => t2 '|' h :: t => t3" := (case t1 t2 h t t3)
+Notation "'case' t1 'of' '|' 'nil' => t2 '|' h :: t => t3" := (case t1 t2 h t t3)
   (in custom tm at level 89,
    t1 custom tm at level 99,
    t2 custom tm at level 99,
    h constr at level 0,
    t constr at level 0,
-   t3 custom tm at level 99).
+   t3 custom tm at level 99,
+   format "'[hv' 'case'  t1  'of' '//' '|'  'nil'  '=>'  t2 '//' '|'  h  '::'  t  '=>'  t3 ']'").
 
-Check <{ case [] of | [] => 0 | "h" :: "t" => succ '"h" }>.
+Check <{ case nil of | nil => 0 | "h" :: "t" => succ '"h" }>.
 (* case nil (const 0) "h" "t" (succ (var "h")) : tm *)
 
-Check <{ case (1 :: 2 :: []) of
-          | [] => 0
+Check <{ case (1 :: 2 :: nil) of
+          | nil => 0
           | "h" :: "t" => '"h" + '"t" }>.
 (* case (cons (const 1) (cons (const 2) nil)) (const 0) "h" "t" (add (var "h") (var "t")) : tm *)
 
