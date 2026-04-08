@@ -576,3 +576,65 @@ Proof.
       try solve_by_inverts 1.
     injection Hd as []; auto.
 Qed.
+
+(*--------MOTIVATING EXAMPLES----------*)
+Require Import Notations.
+
+Definition line_count2 : tm :=
+  <{ \"t":NatList,
+    (case '"t" of
+      | [] => 0
+      | "x" :: "xs" => '"x" + (case '"xs" of
+        | [] => 0
+        | "x" :: "xs" => '"x" + (case '"xs" of
+          | [] => 0
+          | "x" :: "xs" => 0)))}> .
+
+Example line_count2_nf :
+  multi step <{`line_count2` [1;1]}> <{2}>.
+Proof.
+  eapply multi_step. apply ST_AppAbs.
+  auto. simpl.
+  eapply multi_step. apply ST_CaseCons.
+  auto. auto. simpl.
+  eapply multi_step_trans. eapply multistep_add2.
+  auto.
+  eapply multi_step. apply ST_CaseCons.
+  auto. auto. simpl.
+  eapply multi_step_trans. eapply multistep_add2.
+  auto.
+  eapply multi_step. apply ST_CaseNil.
+  apply multi_refl.
+  eapply multi_step. apply ST_AddConst.
+  simpl. apply multi_refl.
+  eapply multi_step. apply ST_AddConst.
+  simpl. apply multi_refl.
+Qed.
+
+Definition _1A0nA : tm' :=
+  (cons' (const' [(1,(pc_Feature "A"));(0, (pc_Not (pc_Feature"A")))])
+        (cons' (const' [(1,pc_True)]) nil')).
+
+Example lift_line_count2_nf :
+  multi step' (app' (lift line_count2) _1A0nA)
+            (const' [(2,(pc_And (pc_Feature "A") (pc_And pc_True pc_True)));
+                     (1,(pc_And (pc_Not (pc_Feature "A")) (pc_And pc_True pc_True)))]).
+Proof.
+  unfold _1A0nA. simpl.
+  eapply multi_step. apply ST_AppAbs'.
+  auto. simpl.
+  eapply multi_step. apply ST_CaseCons'.
+  auto. auto. simpl.
+  eapply multi_step'_trans. eapply multistep'_add2'.
+  auto.
+  eapply multi_step. apply ST_CaseCons'.
+  auto. auto. simpl.
+  eapply multi_step'_trans. eapply multistep'_add2'.
+  auto.
+  eapply multi_step. apply ST_CaseNil'.
+  apply multi_refl.
+  eapply multi_step. apply ST_AddConst'.
+  apply multi_refl.
+  eapply multi_step. apply ST_AddConst'.
+  simpl. apply multi_refl.
+Qed.
