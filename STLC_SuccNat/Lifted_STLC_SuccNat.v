@@ -742,7 +742,7 @@ Proof.
       apply ST_Case1'; eauto. auto.
 Qed.
 
-Lemma multistep'_add1' `{NatOp}: forall t1' t2' t3',
+Lemma multistep'_op1' `{NatOp}: forall t1' t2' t3',
   multi step' t1' t2' -> multi step' (op' t1' t3') (op' t2' t3').
 Proof.
   intros t1' t2' t3' STM. induction STM.
@@ -751,7 +751,7 @@ Proof.
      apply ST_Op1'; eauto.  auto.
 Qed.
 
-Lemma multistep'_add2' `{NatOp}: forall v' t1' t2',
+Lemma multistep'_op2' `{NatOp}: forall v' t1' t2',
   value' v' -> multi step' t1' t2' -> multi step' (op' v' t1') (op' v' t2').
 Proof.
   intros v' t1' t2' V STM. induction STM.

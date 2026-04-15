@@ -12,11 +12,11 @@ Hint Constructors has_type' : core.
 Hint Extern 2 (has_type' _ (app' _ _) _) => eapply T_App'; auto : core.
 Hint Extern 2 (_ = _) => compute; reflexivity : core.
 
-Definition halts' t' : Prop := exists t1', multi step' t' t1' /\ value' t1'.
+Definition halts' t' `{NatOp}: Prop := exists t1', multi step' t' t1' /\ value' t1'.
 
-Lemma value'_halts' : forall v', value' v' -> halts' v'.
+Lemma value'_halts' `{NatOp}: forall v', value' v' -> halts' v'.
 Proof.
-  intros v H. unfold halts'.
+  intros v H0. unfold halts'.
   exists v. split.
   - apply multi_refl.
   - assumption.
@@ -33,8 +33,8 @@ Inductive appears_free_in' : string -> tm' -> Prop :=
       appears_free_in' x (abs' y T11' t12')
   (* nats*)
   |afi_succ' : forall x t1', appears_free_in' x t1' -> appears_free_in' x (succ' t1')
-  |afi_add1' : forall x t1' t2', appears_free_in' x t1' -> appears_free_in' x (add' t1' t2')
-  |afi_add2' : forall x t1' t2', appears_free_in' x t2' -> appears_free_in' x (add' t1' t2')
+  |afi_op1' : forall x t1' t2', appears_free_in' x t1' -> appears_free_in' x (op' t1' t2')
+  |afi_op2' : forall x t1' t2', appears_free_in' x t2' -> appears_free_in' x (op' t1' t2')
   (* lists *)
   |afi_cons1' : forall x t1' t2', appears_free_in' x t1' -> appears_free_in' x (cons' t1' t2')
   |afi_cons2' : forall x t1' t2', appears_free_in' x t2' -> appears_free_in' x (cons' t1' t2')
@@ -121,7 +121,7 @@ Proof.
   discriminate C.
 Qed.
 
-Fixpoint R' (T':ty') (t':tm') : Prop :=
+Fixpoint R' `{NatOp} (T':ty') (t':tm') : Prop :=
   has_type' empty t' T' /\ halts' t' /\
   (match T' with
     | Nat' => True
@@ -129,19 +129,19 @@ Fixpoint R' (T':ty') (t':tm') : Prop :=
     | NatList' => True
     end).
 
-Lemma R'_halts' : forall {T'} {t'}, R' T' t' -> halts' t'.
+Lemma R'_halts' `{NatOp}: forall {T'} {t'}, R' T' t' -> halts' t'.
 Proof.
   intros.
-  destruct T'; unfold R' in H; destruct H as [_ [H _] ]; assumption.
+  destruct T'; unfold R' in H0; destruct H0 as [_ [H0 _] ]; assumption.
 Qed.
 
-Lemma R'_typable_empty : forall {T'} {t'}, R' T' t' -> has_type' empty t' T'.
+Lemma R'_typable_empty `{NatOp}: forall {T'} {t'}, R' T' t' -> has_type' empty t' T'.
 Proof.
   intros.
-  destruct T'; unfold R' in H; destruct H as [H _]; assumption.
+  destruct T'; unfold R' in H0; destruct H0 as [H0 _]; assumption.
 Qed.
 
-Lemma step'_preserves_halting :
+Lemma step'_preserves_halting `{NatOp}:
   forall t' t1', (step' t' t1') -> (halts' t' <-> halts' t1').
 Proof.
  intros t t' ST.  unfold halts'.
@@ -150,14 +150,14 @@ Proof.
   intros [t'' [STM V] ].
   destruct STM.
    + value'_no_step.
-   + rewrite (determinism' _ _ _ ST H). exists z. split; assumption.
+   + rewrite (determinism' _ _ _ ST H0). exists z. split; assumption.
  - (* <- *)
   intros [t'0 [STM V] ].
   exists t'0. split; auto.
   apply multi_step with (y:= t'); auto.
 Qed.
 
-Lemma step'_preserves_R' : forall T' t' t1', (step' t' t1') -> R' T' t' -> R' T' t1'.
+Lemma step'_preserves_R' `{NatOp}: forall T' t' t1', (step' t' t1') -> R' T' t' -> R' T' t1'.
 Proof.
  induction T';  intros t t' E Rt; unfold R'; fold R'; unfold R' in Rt; fold R' in Rt;
                destruct Rt as [typable_empty_t [halts_t RRt] ].
@@ -178,15 +178,15 @@ Proof.
   auto.
 Qed.
 
-Lemma multistep'_preserves_R' : forall T' t' t1',
+Lemma multistep'_preserves_R' `{NatOp}: forall T' t' t1',
   (multi step' t' t1') -> R' T' t' -> R' T' t1'.
 Proof.
   intros T t t' STM; induction STM; intros.
   assumption.
-  apply IHSTM. eapply step'_preserves_R'. apply H. assumption.
+  apply IHSTM. eapply step'_preserves_R'. apply H0. assumption.
 Qed.
 
-Lemma step'_preserves_R1' : forall T' t' t1',
+Lemma step'_preserves_R1' `{NatOp}: forall T' t' t1',
   has_type' empty t' T' -> (step' t' t1') -> R' T' t1' -> R' T' t'.
 Proof.
   induction T'; intros t t' typable_empty_t E Rt; unfold R'; fold R'; unfold R' in Rt; fold R' in Rt;
@@ -210,13 +210,13 @@ Proof.
   auto.
 Qed.
 
-Lemma multistep'_preserves_R1' : forall T' t' t1',
+Lemma multistep'_preserves_R1' `{NatOp}: forall T' t' t1',
   has_type' empty t' T' -> (multi step' t' t1') -> R' T' t1' -> R' T' t'.
 Proof.
   intros T t t' HT STM.
   induction STM; intros.
     assumption.
-    eapply step'_preserves_R1'.  assumption. apply H. apply IHSTM.
+    eapply step'_preserves_R1'.  assumption. apply H0. apply IHSTM.
     eapply preservation';  eauto. auto.
 Qed.
 
@@ -243,7 +243,7 @@ Proof with eauto.
     intros H; eauto.
  - (* Succ' *)
     rewrite IHt'...
- - (* Add' *)
+ - (* Op' *)
     rewrite IHt'1, IHt'2.
     reflexivity.
     intros H; eauto.
@@ -294,7 +294,7 @@ Proof with eauto.  (* rather slow this way *)
      inversion A.
     - (* succ' *)
      inversion A; subst...
-    - (* add' *)
+    - (* op' *)
      inversion A; subst...
     - (* nil' *)
      inversion A; subst...
@@ -337,7 +337,7 @@ Proof with eauto.
    reflexivity.
   - (* succ' *)
    rewrite IHt'...
-  - (* add' *)
+  - (* op' *)
    rewrite IHt'1, IHt'2...
   - (* nil' *)
    reflexivity.
@@ -365,14 +365,14 @@ Proof.
   - simpl. rewrite swap_subst'; eauto.
 Qed.
 
-Inductive instantiation' : tass' -> env' -> Prop :=
+Inductive instantiation' `{NatOp}: tass' -> env' -> Prop :=
   | V_nil' : instantiation' [] []
   | V_cons' : forall x T' v' c e,
       value' v' -> R' T' v' ->
       instantiation' c e ->
       instantiation' ((x,T')::c) ((x,v')::e).
 
-Lemma instantiation'_domains_match: forall {c} {e},
+Lemma instantiation'_domains_match `{NatOp}: forall {c} {e},
   instantiation' c e ->
   forall {x} {T'},
     lookup x c = Some T' -> exists t', lookup x e = Some t'.
@@ -383,7 +383,7 @@ Proof.
     destruct (eqb x x0); eauto.
 Qed.
 
-Lemma instantiation'_env'_closed' :forall c e,
+Lemma instantiation'_env'_closed' `{NatOp}: forall c e,
   instantiation' c e -> closed'_env' e.
 Proof.
   intros c e V; induction V; intros.
@@ -393,7 +393,7 @@ Proof.
     eapply typable_empty__closed'. eapply R'_typable_empty. eauto.
 Qed.
 
-Lemma instantiation'_R' : forall c e,
+Lemma instantiation'_R' `{NatOp}: forall c e,
   instantiation' c e ->
   forall x t' T',
     lookup x c = Some T' ->
@@ -406,7 +406,7 @@ Proof.
       eauto.
 Qed.
 
-Lemma instantiation'_drop : forall c env',
+Lemma instantiation'_drop `{NatOp}: forall c env',
     instantiation' c env' ->
     forall x, instantiation' (drop x c) (drop x env').
 Proof.
@@ -431,20 +431,20 @@ Proof.
         apply IHss. inversion H; auto.
 Qed.
 
-Lemma msubst'_preserves_typing : forall c e,
+Lemma msubst'_preserves_typing `{NatOp}: forall c e,
   instantiation' c e->
   forall Gamma' t' S', has_type' (mupdate' Gamma' c) t' S' ->
   has_type' Gamma' (msubst' e t') S'.
 Proof.
-    intros c e H. induction H; intros.
-    simpl in H. simpl. auto.
-    simpl in H2.  simpl.
+    intros c e H0. induction H0; intros.
+    simpl in H0. simpl. auto.
+    simpl in H3.  simpl.
     apply IHinstantiation'.
     eapply substitution_preserves_typing'; eauto.
-    apply (R'_typable_empty H0).
+    apply (R'_typable_empty H1).
 Qed.
 
-Lemma msubst'_R' : forall c env' t' T',
+Lemma msubst'_R' `{NatOp}: forall c env' t' T',
   has_type' (mupdate' empty c) t' T' ->
   instantiation' c env' ->
   R' T' (msubst' env' t').
@@ -459,7 +459,7 @@ Proof.
   induction HT; intros.
 
   - (*T_Var'*)
-    rewrite H0 in H. destruct (instantiation'_domains_match V H) as [t' P].
+    rewrite H1 in H0. destruct (instantiation'_domains_match V H0) as [t' P].
     eapply instantiation'_R'; eauto.
     rewrite msubst'_var'. rewrite P. auto. eapply instantiation'_env'_closed'; eauto.
   - (*T_Abs'*)
@@ -472,7 +472,7 @@ Proof.
           intros.
           unfold update, t_update. rewrite mupdate'_drop. destruct (eqb_spec x x0).
           + auto.
-          + rewrite H.
+          + rewrite H0.
             clear - c n. induction c.
             simpl. false_eqb_string; auto.
             simpl. destruct a.  unfold update, t_update.
@@ -481,8 +481,8 @@ Proof.
            auto.
          split. apply value'_halts'. apply v_abs'.
          intros.
-         destruct (R'_halts' H0) as [v [P Q] ].
-         pose proof (multistep'_preserves_R' _ _ _ P H0).
+         destruct (R'_halts' H1) as [v [P Q] ].
+         pose proof (multistep'_preserves_R' _ _ _ P H1).
          apply multistep'_preserves_R1' with (msubst' ((x,v)::env0') t').
             eapply T_App'. eauto.
             apply R'_typable_empty; auto.
@@ -491,21 +491,21 @@ Proof.
             simpl.  rewrite subst'_msubst'.
             eapply ST_AppAbs'; eauto.
             eapply typable_empty__closed'.
-            apply (R'_typable_empty H1).
+            apply (R'_typable_empty H2).
             eapply instantiation'_env'_closed'; eauto.
             eapply (IHHT ((x,T2')::c)).
                intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto.
             constructor; auto.
   - (* T_App' *)
     rewrite msubst'_app'.
-    destruct (IHHT1 c H env0' V) as [_ [_ P1] ].
-    pose proof (IHHT2 c H env0' V) as P2.  fold R' in P1.  auto.
+    destruct (IHHT1 c H0 env0' V) as [_ [_ P1] ].
+    pose proof (IHHT2 c H0 env0' V) as P2.  fold R' in P1.  auto.
   - (* T_Const' *)
      rewrite msubst'_const'.
      split. auto. split. apply value'_halts'; auto. auto.
   - (* T_Succ' *)
     rewrite msubst'_succ'.
-    apply (IHHT c H env0') in V as IH.
+    apply (IHHT c H0 env0') in V as IH.
     clear IHHT.
     destruct (R'_halts' IH) as [v [Hm Hv] ].
     apply R'_typable_empty in IH as H1.
@@ -519,18 +519,18 @@ Proof.
       apply (canonical_forms_nat' v A) in Hv as [n Hv].
       rewrite Hv. exists (const' (map (fun '(n0,pc) => (S (n0),pc)) n)); eauto.
       auto.
-  - (* T_Add' *)
-    rewrite msubst'_add'.
-    apply (IHHT1 c H env0') in V as IH1.
-    apply (IHHT2 c H env0') in V as IH2.
+  - (* T_Op' *)
+    rewrite msubst'_op'.
+    apply (IHHT1 c H0 env0') in V as IH1.
+    apply (IHHT2 c H0 env0') in V as IH2.
     clear IHHT1 IHHT2.
     destruct (R'_halts' IH1) as [v1' [Hm1' Hv1']].
     destruct (R'_halts' IH2) as [v2' [Hm2' Hv2']].
     eapply multistep'_preserves_R1'.
       eauto using R'_typable_empty.
       eapply multi_step'_trans.
-      eapply multistep'_add1'. exact Hm1'.
-      eapply multistep'_add2'; eassumption.
+      eapply multistep'_op1'. exact Hm1'.
+      eapply multistep'_op2'; eassumption.
     eapply (multistep'_preserves_R' _ _ _ Hm1') in IH1
       as [A1 [B1 _]].
     eapply (multistep'_preserves_R' _ _ _ Hm2') in IH2
@@ -539,16 +539,16 @@ Proof.
       eauto.
       apply (canonical_forms_nat' v1' A1) in Hv1' as [n1' Hv1'].
       apply (canonical_forms_nat' v2' A2) in Hv2' as [n2' Hv2'].
-      rewrite Hv1', Hv2'. exists (const' (app_binop Nat.add n1' n2')).
-      split. econstructor. apply ST_AddConst'. apply multi_refl. auto.
+      rewrite Hv1', Hv2'. exists (const' (app_binop nat_op n1' n2')).
+      split. econstructor. apply ST_OpConst'. apply multi_refl. auto.
       auto.
   - (* T_Nil' *)
     rewrite msubst'_nil'.
     split. auto. split. apply value'_halts'; auto. auto.
   - (* T_Cons' *)
     rewrite msubst'_cons'.
-    pose proof (IHHT1 c H env0' V) as P1.
-    pose proof (IHHT2 c H env0' V) as P2.
+    pose proof (IHHT1 c H0 env0' V) as P1.
+    pose proof (IHHT2 c H0 env0' V) as P2.
     split. apply T_Cons'.
     destruct P1 as [HT _]. auto.
     destruct P2 as [HT _]. auto.
@@ -558,11 +558,11 @@ Proof.
     exists (cons' v1 v2); split; auto.
     pose proof (multistep'_cons1' _ _ (msubst' env0' t2') Hms1).
     pose proof (multistep'_cons2' _ _ _ Hv1 Hms2).
-    apply (multi_step'_trans _ _ _ H0 H1).
+    apply (multi_step'_trans _ _ _ H1 H2).
   - (* T_Case' *)
     rewrite msubst'_case'.
-    pose proof (IHHT1 c H env0' V) as P1.
-    pose proof (IHHT2 c H env0' V) as P2.
+    pose proof (IHHT1 c H0 env0' V) as P1.
+    pose proof (IHHT2 c H0 env0' V) as P2.
     clear IHHT1 IHHT2.
     assert (WT: has_type' empty (case' (msubst' env0' t1') (msubst' env0' tnil') x y
                   (msubst' (drop y (drop x env0')) tcons')) T').
@@ -576,7 +576,7 @@ Proof.
           unfold update, t_update. repeat rewrite mupdate'_drop.
           destruct (eqb_spec x x0); destruct (eqb_spec y x0);
           try auto.
-            rewrite H.
+            rewrite H0.
             clear - c n n0. induction c.
             simpl. repeat false_eqb_string; auto.
             simpl. destruct a.  unfold update, t_update.
@@ -588,13 +588,13 @@ Proof.
       + inversion WT; subst. assumption.
       + eapply multistep'_case1'. exact Hm.
       + pose proof (canonical_forms_list' v1).
-        destruct H0.
+        destruct H3.
         eapply preservation'_multi;
           [ exact H1 |
             exact Hm ].
         exact Hv.
         * (* case nil' *)
-          clear - P2 Hm WT H0.
+          clear - P2 Hm WT H3.
           pose proof (R'_halts' P2) as [v [H1 H2]].
           subst. eapply multistep'_preserves_R1'.
           eapply preservation'_multi.
@@ -604,8 +604,8 @@ Proof.
           eapply multistep'_preserves_R'.
           exact H1. exact P2.
         * (* case cons' *)
-          clear - V P1 H H1 IHHT3 Hm WT H0.
-          destruct H0 as [v2 [v3 [Hv2 [Hv3 Heq]]]].
+          clear - V P1 H0 H2 IHHT3 Hm WT H3.
+          destruct H3 as [v2 [v3 [Hv2 [Hv3 Heq]]]].
           subst. eapply multistep'_preserves_R1'.
           eapply preservation'_multi.
           exact WT. apply multistep'_case1'. exact Hm.
@@ -614,7 +614,7 @@ Proof.
           rewrite drop_comm.
           apply R'_typable_empty in P1.
           eapply (preservation'_multi) in P1; eauto.
-          inversion P1; subst; clear P1 H1.
+          inversion P1; subst; clear P1 H2.
           repeat rewrite <- subst'_msubst';
             eauto using typable_empty__closed',
                         instantiation'_env'_closed'.
@@ -631,26 +631,26 @@ Proof.
           apply instantiation'_drop; auto.
 Qed.
 
-Theorem normalization' : forall t' T', has_type' empty t' T' -> halts' t'.
+Theorem normalization' `{NatOp}: forall t' T', has_type' empty t' T' -> halts' t'.
 Proof.
   intros.
   replace t' with (msubst' [] t') by reflexivity.
-  apply (@R'_halts' T').
+  apply (@R'_halts' H T').
   apply (msubst'_R' []); eauto.
   eapply V_nil'.
 Qed.
 
-Corollary analysis'_normalization': forall analysis' T1' T2',
+Corollary analysis'_normalization' `{NatOp}: forall analysis' T1' T2',
   has_type' empty analysis' (Arrow' T1' T2') ->
   exists v', multi step' analysis' v' /\ (exists x body', v' = abs' x T1' body').
 Proof.
   intros.
-  assert (H0: halts' analysis').
-  { eapply normalization'. exact H. }
-  destruct H0 as [v' [H1 H2] ].
+  assert (H1: halts' analysis').
+  { eapply normalization'. exact H0. }
+  destruct H1 as [v' [H2 H3] ].
   exists v'. split.
-  - exact H1.
-  - apply (preservation'_multi _ _ _ H) in H1.
-    apply (canonical_forms_fun' _ _ _ H1 H2).
+  - exact H2.
+  - apply (preservation'_multi _ _ _ H0) in H2.
+    apply (canonical_forms_fun' _ _ _ H2 H3).
 Qed.
 

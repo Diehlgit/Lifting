@@ -84,12 +84,12 @@ Check <{ succ' succ' [(42,<["A"]>)] }>'.
 Check <{ (\"f" : Nat' , succ' '"f") [(42,<["A"]>)] }>'.
 (* app' (abs' "f" Nat' (succ' (var' "f"))) (const' [(42,<["A"]>)]) : tm' *)
 
-Notation "t1 + t2" := (add' t1 t2)
+Notation "t1 'op' t2" := (op' t1 t2)
   (in custom tm' at level 50, left associativity,
    t1 custom tm', t2 custom tm' at level 49).
 
-Check <{ [(42,<[T]>)] + [(1,<[T]>)] }>'.                     (* add (const 42) (const 1) : tm' *)
-Check <{ succ' [(1,<[T]>)] + [(2,<[T]>)] }>'.              (* add (succ (const 1)) (const 2) : tm' *)
+Check <{ [(42,<[T]>)] op [(1,<[T]>)] }>'.                     (* op (const 42) (const 1) : tm' *)
+Check <{ succ' [(1,<[T]>)] op [(2,<[T]>)] }>'.              (* op (succ (const 1)) (const 2) : tm' *)
 
 Notation "'nil''" := nil' (in custom tm' at level 0).
 
@@ -127,6 +127,6 @@ Check <{ case nil' of | nil' => [(0,<[T]>)] | "h" :: "t" => succ' '"h" }>'.
 
 Check <{ case ([(1,<[T]>)] :: [(2,<[F]>)] :: nil') of
           | nil' => [(0,<[T]>)]
-          | "h" :: "t" => '"h" + '"t" }>'.
-(* case (cons (const 1) (cons (const 2) nil)) (const 0) "h" "t" (add (var "h") (var "t")) : tm' *)
+          | "h" :: "t" => '"h" op '"t" }>'.
+(* case (cons (const 1) (cons (const 2) nil)) (const 0) "h" "t" (op (var "h") (var "t")) : tm' *)
 

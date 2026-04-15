@@ -170,8 +170,8 @@ Proof.
     simpl. apply IHss.
 Qed.
 
-Lemma msubst_add : forall ss t1 t2,
-  msubst ss (add t1 t2) = add (msubst ss t1) (msubst ss t2).
+Lemma msubst_op : forall ss t1 t2,
+  msubst ss (op t1 t2) = op (msubst ss t1) (msubst ss t2).
 Proof.
   induction ss; intros.
     reflexivity.
@@ -254,8 +254,8 @@ Proof.
     simpl. apply IHss.
 Qed.
 
-Lemma msubst'_add' : forall ss t1' t2',
-  msubst' ss (add' t1' t2') = add' (msubst' ss t1') (msubst' ss t2').
+Lemma msubst'_op' : forall ss t1' t2',
+  msubst' ss (op' t1' t2') = op' (msubst' ss t1') (msubst' ss t2').
 Proof.
   induction ss; intros.
     reflexivity.

@@ -43,7 +43,7 @@ Proof.
   apply T_Var. reflexivity.
 Qed.
 
-Example plusone_0_is_1:
+Example plusone_0_is_1 `{NatOp}:
   step_normal_form_of (STLC_SuccNat.app plusone (const 0)) (const 1).
 Proof.
   split.
@@ -55,7 +55,7 @@ Proof.
   - intros [t' Contra]. inversion Contra.
 Qed.
 
-Example plustwo_3_is_5:
+Example plustwo_3_is_5 `{NatOp}:
   step_normal_form_of (STLC_SuccNat.app plustwo (const 3)) (const 5).
 Proof.
   split.
@@ -101,7 +101,7 @@ Definition z' := [ (19, pc_True) ].
 
 
 (* plusone(x'|p) = (plusone'(x'))|p *)
-Example comm_plusone_x': forall (cfg:feat_config) (x n:nat) (n':nat'),
+Example comm_plusone_x' `{NatOp}: forall (cfg:feat_config) (x n:nat) (n':nat'),
   (derive x' cfg ) = Some x ->
   step_normal_form_of (STLC_SuccNat.app plusone (const x)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' x')) (const' n') ->
@@ -112,25 +112,25 @@ Proof.
 
   (*Trying to simplify Hmstep*)
   inversion Hmstep; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try (solve_by_inverts 1).
-  simpl in H0. inversion H0; subst.
-  inversion H1; subst;
-    try (solve_by_inverts 1).
+  simpl in H1. inversion H1; subst.
   inversion H2; subst;
     try (solve_by_inverts 1).
-  clear Hmstep H0 H H6 H2 H1.
+  inversion H3; subst;
+    try (solve_by_inverts 1).
+  clear Hmstep H1 H0 H7 H3 H2.
 
   (*Trying to simplify Hmstep'*)
   inversion Hmstep'; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try (solve_by_inverts 1);
-    clear Hmstep' H.
-  inversion H0; subst.
-  inversion H; subst;
+    clear Hmstep' H0.
+  inversion H1; subst.
+  inversion H0; subst;
     try (solve_by_inverts 1);
-    clear H0 H.
-  inversion H1; subst;
+    clear H1 H0.
+  inversion H2; subst;
     try (solve_by_inverts 1).
 
   (* Case analysis on the feature configuration *)
@@ -144,7 +144,7 @@ Proof.
 Qed.
 
 (* plusone(y'|p) = (plusone'(y'))|p *)
-Example comm_plusone_y: forall (cfg:feat_config) (y n: nat) (n':nat'),
+Example comm_plusone_y `{NatOp}: forall (cfg:feat_config) (y n: nat) (n':nat'),
   (derive y' cfg) = Some y ->
   step_normal_form_of (STLC_SuccNat.app plusone (const y)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' y')) (const' n') ->
@@ -155,28 +155,28 @@ Proof.
 
   (*Simplifying Hmstep to find value of n*)
   inversion Hmstep; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H Hmstep.
-  inversion H0; subst.
-  inversion H; subst;
+    clear H0 Hmstep.
+  inversion H1; subst.
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
+    clear H0 H1.
+  inversion H2; subst;
     try solve_by_inverts 1.
-  clear H1 H6.
+  clear H2 H7.
 
   (*Simplifying Hmstep' to find value of n'*)
   inversion Hmstep'; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H Hmstep'.
-  inversion H0; subst.
-  inversion H; subst;
+    clear H0 Hmstep'.
+  inversion H1; subst.
+  inversion H0; subst;
     try solve_by_inverts 2;
-    clear H H0.
-  simpl in H1.
-  inversion H1; subst;
+    clear H0 H1.
+  simpl in H2.
+  inversion H2; subst;
     try solve_by_inverts 1.
 
   (* Case analysis on the feature configuration *)
@@ -188,7 +188,7 @@ Proof.
 Qed.
 
 (* plusone(z'|p) = (plusone'(z'))|p *)
-Example comm_plusone_z: forall (cfg:feat_config) (z n: nat) (n':nat'),
+Example comm_plusone_z `{NatOp}: forall (cfg:feat_config) (z n: nat) (n':nat'),
   (derive z' cfg) = Some z ->
   step_normal_form_of (STLC_SuccNat.app plusone (const z)) (const n) ->
   step'_normal_form_of (app' (lift plusone) (const' z')) (const' n') ->
@@ -200,34 +200,34 @@ Proof.
 
   (*Simplifying Hmstep to find value of n*)
   inversion Hmstep; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H Hmstep.
-  inversion H0; subst.
-  inversion H; subst;
+    clear H0 Hmstep.
+  inversion H1; subst.
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
+    clear H0 H1.
+  inversion H2; subst;
     try solve_by_inverts 1.
-  clear H1 H6.
+  clear H2 H7.
 
   (*Simplifying Hmstep' to find value of n'*)
   inversion Hmstep'; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H Hmstep'.
-  inversion H0; subst.
-  inversion H; subst;
+    clear H0 Hmstep'.
+  inversion H1; subst.
+  inversion H0; subst;
     try solve_by_inverts 2;
-    clear H H0.
-  simpl in H1.
-  inversion H1; subst;
+    clear H0 H1.
+  simpl in H2.
+  inversion H2; subst;
     try solve_by_inverts 1.
 
   simpl. reflexivity.
 Qed.
 
-Example lift_plusone_correct: forall spl cfg p r r',
+Example lift_plusone_correct `{NatOp}: forall spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift plusone) (const' spl)) (const' r') ->
   step_normal_form_of (app plusone (const p)) (const r) ->
@@ -236,30 +236,30 @@ Proof.
   intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
 
   inversion Hmstep; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H6.
-  simpl in H.
-  inversion H0; subst.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-    clear H1 H0.
+    clear H7.
+  simpl in H0.
+  inversion H1; subst.
   inversion H2; subst;
+    try solve_by_inverts 1.
+    clear H2 H1.
+  inversion H3; subst;
     try solve_by_inverts 1;
-    clear H H2.
+    clear H0 H3.
 
   inversion Hmstep'; subst.
-  inversion H; subst;
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H H6.
-    simpl in H0.
-  inversion H0; subst.
-  inversion H; subst;
+    clear H0 H7.
+    simpl in H1.
+  inversion H1; subst.
+  inversion H0; subst;
     try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
+    clear H0 H1.
+  inversion H2; subst;
     try solve_by_inverts 1;
-    clear H1.
+    clear H2.
 
   apply mapping_not_change_deriving.
   assumption.
@@ -270,7 +270,7 @@ Ltac normalize :=
 		[ econstructor; econstructor 
 		| try (eapply multi_refl; econstructor); normalize]).
 
-Example lift_plustwo_correct: forall spl cfg p r r',
+Example lift_plustwo_correct `{NatOp}: forall spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
   step_normal_form_of (app plustwo (const p)) (const r) ->
@@ -352,33 +352,33 @@ Qed.
    have closed forms.
 *)
 
-Lemma normal_form_plusn: forall n k,
+Lemma normal_form_plusn `{NatOp}: forall n k,
     step_normal_form_of (app (plusn n) (const k)) (const (n + k)).
 Proof.
   intros. induction n;
   split; try (intros [t contra]; inversion contra).
   - normalize.
   - unfold plusn in *.
-    inversion IHn. clear H0.
-    inversion H; subst.
-    inversion H0; subst;
+    inversion IHn. clear H1.
+    inversion H0; subst.
+    inversion H1; subst;
       try solve_by_inverts 1.
-    clear H7 H0 H IHn.
-    rewrite subst_gen_plusn in H1.
+    clear H8 H1 H0 IHn.
+    rewrite subst_gen_plusn in H2.
 
     eapply multi_step.
     + apply ST_AppAbs. apply v_nat.
     + rewrite subst_gen_plusn. simpl.
-      assert (H: step_normal_form_of (gen_plusn n (const k)) (const (n + k))).
-      { split. exact H1. intros [t contra]; inversion contra. }
-      clear H1.
-      assert (H0: multi step (succ (const (n + k))) (const (S (n + k)))).
+      assert (H0: step_normal_form_of (gen_plusn n (const k)) (const (n + k))).
+      { split. exact H2. intros [t contra]; inversion contra. }
+      clear H2.
+      assert (H1: multi step (succ (const (n + k))) (const (S (n + k)))).
       { normalize. }
-      apply succ_arg_normalizes in H.
-      apply (multi_step_trans _ _ _ H H0).
+      apply succ_arg_normalizes in H0.
+      apply (multi_step_trans _ _ _ H0 H1).
 Qed.
 
-Lemma normal_form'_lift_plusn: forall n k,
+Lemma normal_form'_lift_plusn `{NatOp}: forall n k,
   step'_normal_form_of (app' (lift (plusn n)) (const' k))
     (const' (map (fun '(n0, pc) => (n + n0, pc)) k)).
 Proof.
@@ -393,34 +393,34 @@ Proof.
         - exact IHk. }
       rewrite Hk. apply multi_refl.
   - unfold plusn in *.
-    inversion IHn. clear H0.
-    inversion H; subst.
-    inversion H0; subst;
+    inversion IHn. clear H1.
+    inversion H0; subst.
+    inversion H1; subst;
       try solve_by_inverts 1.
-    clear H7 H0 H IHn.
-    rewrite subst'_gen_plusn in H1.
+    clear H8 H1 H0 IHn.
+    rewrite subst'_gen_plusn in H2.
 
     eapply multi_step.
     + apply ST_AppAbs'. apply v_nat'.
     + rewrite subst'_gen_plusn. simpl.
-      assert (H: step'_normal_form_of (gen_plusn' n (const' k))
+      assert (H0: step'_normal_form_of (gen_plusn' n (const' k))
         (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k))).
-      { split. exact H1. intros [t contra]; inversion contra. }
-      clear H1.
-      assert (H0: multi step' (succ' (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k)))
+      { split. exact H2. intros [t contra]; inversion contra. }
+      clear H2.
+      assert (H1: multi step' (succ' (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k)))
         (const' (map (fun '(n0, pc0) => (S (n + n0), pc0)) k))).
       { eapply multi_step.
         - apply ST_SuccConst'.
         - rewrite map_map_fst. apply multi_refl. }
-      apply succ'_arg_normalizes in H.
-      apply (multi_step'_trans _ _ _ H H0).
+      apply succ'_arg_normalizes in H0.
+      apply (multi_step'_trans _ _ _ H0 H1).
 Qed.
 
 (* Proving that the commutation diagram holds for
    any (+ n) function.
  *)
 
-Theorem lift_plusn_correct: forall n spl cfg p r r',
+Theorem lift_plusn_correct `{NatOp}: forall n spl cfg p r r',
   derive spl cfg = Some p ->
   step'_normal_form_of (app' (lift (plusn n)) (const' spl)) (const' r') ->
   step_normal_form_of (app (plusn n) (const p)) (const r) ->
@@ -450,7 +450,7 @@ Require Import Derivation Norm Lifted_Norm LR.
 
 (* LR examples *)
 
-Example LR_plusone: forall cfg, LR cfg (Arrow Nat Nat) plusone (lift plusone).
+Example LR_plusone `{NatOp}: forall cfg, LR cfg (Arrow Nat Nat) plusone (lift plusone).
 Proof.
   intros. unfold plusone, LR;
   split; [|split]; simpl; eauto.
@@ -459,8 +459,8 @@ Proof.
   pose proof (derive'_value _ _ _ Hd) as [].
   eapply preservation_multi in Hty; eauto.
   eapply preservation'_multi in Hty'; eauto.
-  apply (canonical_forms_nat _ Hty) in H as [n]; subst.
-  apply (canonical_forms_nat' _ Hty') in H0 as [n']; subst.
+  apply (canonical_forms_nat _ Hty) in H0 as [n]; subst.
+  apply (canonical_forms_nat' _ Hty') in H1 as [n']; subst.
   repeat eexists.
   - eapply multi_step_trans.
       eapply multistep_app2; eauto.
@@ -478,7 +478,7 @@ Proof.
       injection Hd as []; auto.
 Qed.
 
-Example LR_plustwo: forall cfg, LR cfg (Arrow Nat Nat) plustwo (lift plustwo).
+Example LR_plustwo `{NatOp}: forall cfg, LR cfg (Arrow Nat Nat) plustwo (lift plustwo).
 Proof.
   intros. unfold plustwo, LR;
   split; [|split]; simpl; eauto.
@@ -487,8 +487,8 @@ Proof.
   pose proof (derive'_value _ _ _ Hd) as [].
   eapply preservation_multi in Hty; eauto.
   eapply preservation'_multi in Hty'; eauto.
-  apply (canonical_forms_nat _ Hty) in H as [n]; subst.
-  apply (canonical_forms_nat' _ Hty') in H0 as [n']; subst.
+  apply (canonical_forms_nat _ Hty) in H0 as [n]; subst.
+  apply (canonical_forms_nat' _ Hty') in H1 as [n']; subst.
   repeat eexists.
   - eapply multi_step_trans.
       eapply multistep_app2; eauto.
@@ -534,11 +534,11 @@ Proof.
     assumption.
 Qed.
 
-Example LR_plusn: forall n cfg, LR cfg (Arrow Nat Nat) (plusn n) (lift (plusn n)).
+Example LR_plusn `{NatOp}: forall n cfg, LR cfg (Arrow Nat Nat) (plusn n) (lift (plusn n)).
 Proof.
   intros. unfold LR.
   repeat split;
-  try destruct H as [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd]]]]]].
+  try destruct H0 as [Hty [Hty' [r [r' [Hsnf [Hsnf' Hd]]]]]].
   - unfold plusn. constructor.
     induction n; simpl; auto.
   - unfold plusn. simpl. constructor.
@@ -558,8 +558,8 @@ Proof.
     pose proof (derive'_value _ _ _ Hd) as [].
     eapply preservation_multi in Hty; [|destruct Hsnf; eassumption].
     eapply preservation'_multi in Hty'; [|destruct Hsnf'; eassumption].
-    apply (canonical_forms_nat _ Hty) in H as [k]; subst.
-    apply (canonical_forms_nat' _ Hty') in H0 as [k']; subst.
+    apply (canonical_forms_nat _ Hty) in H0 as [k]; subst.
+    apply (canonical_forms_nat' _ Hty') in H1 as [k']; subst.
     pose proof (normal_form_plusn n k) as [Hms0 _].
     pose proof (normal_form'_lift_plusn n k') as [Hms0' _].
     apply (multi_step_trans _ _ _ Hms) in Hms0.
@@ -584,30 +584,30 @@ Definition line_count2 : tm :=
   <{ \"t":NatList,
     (case '"t" of
       | nil => 0
-      | "x" :: "xs" => '"x" + (case '"xs" of
+      | "x" :: "xs" => '"x" op (case '"xs" of
         | nil => 0
-        | "x" :: "xs" => '"x" + (case '"xs" of
+        | "x" :: "xs" => '"x" op (case '"xs" of
           | nil => 0
-          | "x" :: "xs" => 0)))}> .
+          | "x" :: "xs" => 0)))}>.
 
 Example line_count2_nf :
-  multi step <{`line_count2` [1;1]}> <{2}>.
+  multi (@step {|nat_op := Nat.add|}) <{`line_count2` [1;1]}> <{2}>.
 Proof.
   eapply multi_step. apply ST_AppAbs.
   auto. simpl.
   eapply multi_step. apply ST_CaseCons.
   auto. auto. simpl.
-  eapply multi_step_trans. eapply multistep_add2.
+  eapply multi_step_trans. eapply multistep_op2.
   auto.
   eapply multi_step. apply ST_CaseCons.
   auto. auto. simpl.
-  eapply multi_step_trans. eapply multistep_add2.
+  eapply multi_step_trans. eapply multistep_op2.
   auto.
   eapply multi_step. apply ST_CaseNil.
   apply multi_refl.
-  eapply multi_step. apply ST_AddConst.
+  eapply multi_step. apply ST_OpConst.
   simpl. apply multi_refl.
-  eapply multi_step. apply ST_AddConst.
+  eapply multi_step. apply ST_OpConst.
   simpl. apply multi_refl.
 Qed.
 
@@ -618,7 +618,7 @@ Definition _1A0nA : tm' :=
         (cons' (const' [(1,pc_True)]) nil')).
 
 Example lift_line_count2_nf :
-  multi step' (app' (lift line_count2) _1A0nA)
+  multi (@step' {|nat_op:=Nat.add|}) (app' (lift line_count2) _1A0nA)
             (const' [(2,(pc_And (pc_Feature "A") (pc_And pc_True pc_True)));
                      (1,(pc_And (pc_Not (pc_Feature "A")) (pc_And pc_True pc_True)))]).
 Proof.
@@ -627,16 +627,16 @@ Proof.
   auto. simpl.
   eapply multi_step. apply ST_CaseCons'.
   auto. auto. simpl.
-  eapply multi_step'_trans. eapply multistep'_add2'.
+  eapply multi_step'_trans. eapply multistep'_op2'.
   auto.
   eapply multi_step. apply ST_CaseCons'.
   auto. auto. simpl.
-  eapply multi_step'_trans. eapply multistep'_add2'.
+  eapply multi_step'_trans. eapply multistep'_op2'.
   auto.
   eapply multi_step. apply ST_CaseNil'.
   apply multi_refl.
-  eapply multi_step. apply ST_AddConst'.
+  eapply multi_step. apply ST_OpConst'.
   apply multi_refl.
-  eapply multi_step. apply ST_AddConst'.
+  eapply multi_step. apply ST_OpConst'.
   simpl. apply multi_refl.
 Qed.
