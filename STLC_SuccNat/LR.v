@@ -640,7 +640,7 @@ Proof.
       auto. destruct (derive n' cfg) eqn:Heq;
       try solve_by_inverts 1.
       injection Hd as Hd; auto.
-  - (* T_Add *)
+  - (* T_Op *)
     rewrite msubst_op, msubst'_op'.
     destruct (IHHT1 c H0 env0 env0' V) as [HT11 [HT1' [r1 [r1' [[Hms1 _] [[Hms1' _] Hd1]]]]]].
     destruct (IHHT2 c H0 env0 env0' V) as [HT22 [HT2' [r2 [r2' [[Hms2 _] [[Hms2' _] Hd2]]]]]].

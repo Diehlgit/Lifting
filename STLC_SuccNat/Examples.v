@@ -578,6 +578,7 @@ Proof.
 Qed.
 
 (*--------MOTIVATING EXAMPLES----------*)
+Require Import Presence_Conditions_Notations Lifted_Notations.
 Require Import Notations.
 
 Definition line_count2 : tm :=
@@ -611,7 +612,6 @@ Proof.
   simpl. apply multi_refl.
 Qed.
 
-Require Import Presence_Conditions_Notations Lifted_Notations.
 
 Definition _1A0nA : tm' :=
   (cons' (const' [(1,(pc_Feature "A"));(0, (pc_Not (pc_Feature"A")))])
@@ -639,4 +639,68 @@ Proof.
   apply multi_refl.
   eapply multi_step. apply ST_OpConst'.
   simpl. apply multi_refl.
+Qed.
+
+Definition line_count3 : tm :=
+  <{ \"t":NatList,
+    (case '"t" of
+      | nil => 0
+      | "x" :: "xs" => '"x" op (case '"xs" of
+        | nil => 0
+        | "x" :: "xs" => '"x" op (case '"xs" of
+          | nil => 0
+          | "x" :: "xs" => '"x" op (case '"xs" of
+            | nil => 0
+            | "x" :: "xs" => 0)))) :: nil }>.
+
+Definition _1T_1A_0nA_1T : tm' :=
+  '<{ [(1,<[T]>)] ::
+     [(1,<["A"]>); (0,<[~"A"]>)] ::
+     [(1,<[T]>)] :: nil' }>'.
+
+Example lift_line_count3:
+  exists nf, (@step'_normal_form_of {|nat_op:=Nat.add|})
+   '<{`lift line_count3` `_1T_1A_0nA_1T`}>' nf.
+Proof.
+  eexists. split.
+  - unfold _1T_1A_0nA_1T. simpl.
+    eapply multi_step. apply ST_AppAbs'.
+    auto. simpl.
+    eapply multi_step'_trans. apply multistep'_cons1'.
+    eapply multi_step. apply ST_CaseCons'.
+    auto. auto. simpl.
+    eapply multi_step'_trans. eapply multistep'_op2'.
+    auto.
+    eapply multi_step. apply ST_CaseCons'.
+    auto. auto. simpl.
+    eapply multi_step'_trans. eapply multistep'_op2'.
+    auto.
+    eapply multi_step. apply ST_CaseCons'.
+    auto. auto. simpl.
+    eapply multi_step'_trans. eapply multistep'_op2'.
+    auto.
+    eapply multi_step. apply ST_CaseNil'.
+    auto. auto.
+    eapply multi_step'_trans. eapply multistep'_op2'.
+    auto.
+    eapply multi_step. apply ST_OpConst'.
+    auto.
+    eapply multi_step. apply ST_OpConst'.
+    auto.
+    eapply multi_step. apply ST_OpConst'.
+    auto.
+    auto.
+  - intros [H0 contra].
+    simpl in contra. solve_by_inverts 2.
+Qed.
+
+Print commutes.
+
+Example lift_line_count3' `{NatOp}: forall conf,
+  commutes NatList conf line_count3.
+Proof.
+  intros. apply commutativity.
+  unfold base_ty. right; auto.
+  unfold line_count3.
+  repeat econstructor.
 Qed.
