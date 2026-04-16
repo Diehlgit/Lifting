@@ -5,7 +5,7 @@ STLC_SuccNat.v
 Lifted_STLC_SuccNat.v
 Environments.v
 Examples.v
-Norm.v
-Lifted_Norm.v
+Msubst.v
+Lifted_Msubst.v
 LR.v
 

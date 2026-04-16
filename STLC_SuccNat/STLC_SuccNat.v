@@ -11,6 +11,7 @@ Inductive tm : Type :=
   | var : string -> tm
   | app : tm -> tm -> tm
   | abs : string -> ty -> tm -> tm
+  | fixp : tm -> tm
 
   | const : nat -> tm
   | succ : tm -> tm.
@@ -26,6 +27,7 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
   | var y => if String.eqb x y then s else t
   | abs y T t1 => if String.eqb x y then t else abs y T (subst x s t1)
   | app t1 t2 => app (subst x s t1) (subst x s t2)
+  | fixp t1 => fixp (subst x s t1)
 
   | const _ => t
   | succ t1 => succ (subst x s t1)
@@ -41,6 +43,11 @@ Inductive step : tm -> tm -> Prop :=
       step (app t1 t2) (app t1' t2)
   | ST_AppAbs: forall x T t1 t2,
     step (app (abs x T t1) t2) (subst x t2 t1)
+  | ST_Fixp: forall t1 t2,
+    step t1 t2 ->
+      step (fixp t1) (fixp t2)
+  | ST_FixpAbs: forall x T t1,
+    step (fixp (abs x T t1)) (subst x (fixp (abs x T t1)) t1)
 
   | ST_Succ: forall t1 t1',
     step t1 t1' ->
@@ -76,6 +83,9 @@ Inductive has_type : context -> tm -> ty -> Prop :=
     has_type Gamma t1 (Arrow T2 T1) ->
     has_type Gamma t2 T2 ->
       has_type Gamma (app t1 t2) T1
+  | T_Fixp : forall Gamma T1 t1,
+    has_type Gamma t1 (Arrow T1 T1) ->
+      has_type Gamma (fixp t1) T1
 
   | T_Nat : forall Gamma (n : nat),
     has_type Gamma (const n) Nat
@@ -145,6 +155,10 @@ Proof.
       eauto; eexists; econstructor; assumption.
     + eapply canonical_forms_fun in Ht1 as [x0 [u Ht1]]; subst;
       eauto; eexists; econstructor; assumption.
+  - right. destruct IHHt; auto.
+    + eapply canonical_forms_fun in Ht as [x [u Ht]]; subst;
+      eauto; eexists; econstructor; assumption.
+    + destruct H; eexists; eapply ST_Fixp; eauto.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat in H as [n H]; subst; eauto.
       eexists. apply ST_SuccConst.
@@ -224,6 +238,10 @@ Proof.
     eassumption.
     inversion Ht2; inversion H4; subst;
     try eassumption.
+  inversion Ht; subst.
+  eapply substitution_preserves_typing.
+    eassumption.
+    apply (T_Fixp _ _ _ Ht).
 Qed.
 
 Lemma preservation_multi: forall t t' T,
@@ -291,4 +309,13 @@ Proof.
    apply multi_refl.
    eapply multi_step.
      apply ST_Succ; eauto.  auto.
+Qed.
+
+Lemma multistep_fixp : forall t1 t2,
+  multi step t1 t2 -> multi step (fixp t1) (fixp t2).
+Proof.
+  intros t1 t2 STM. induction STM.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_Fixp; eauto. auto.
 Qed.

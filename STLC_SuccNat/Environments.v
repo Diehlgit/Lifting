@@ -121,6 +121,15 @@ Proof.
     simpl. rewrite <- IHss. reflexivity.
 Qed.
 
+Lemma msubst_fixp : forall ss t1,
+  msubst ss (fixp t1) = fixp (msubst ss t1).
+Proof.
+  induction ss; intros.
+    reflexivity.
+    destruct a.
+     simpl. rewrite <- IHss. reflexivity.
+Qed.
+
 Lemma msubst_const : forall ss n,
   msubst ss (const n) = const n.
 Proof.
@@ -150,6 +159,15 @@ Qed.
 
 Lemma msubst'_app' : forall ss t1' t2',
     msubst' ss (app' t1' t2') = app' (msubst' ss t1') (msubst' ss t2').
+Proof.
+ induction ss; intros.
+   reflexivity.
+   destruct a.
+    simpl. rewrite <- IHss. reflexivity.
+Qed.
+
+Lemma msubst'_fixp' : forall ss t1',
+  msubst' ss (fixp' t1') = fixp' (msubst' ss t1').
 Proof.
  induction ss; intros.
    reflexivity.

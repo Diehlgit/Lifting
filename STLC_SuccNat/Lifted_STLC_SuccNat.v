@@ -20,6 +20,7 @@ Inductive tm' :=
   | var' : string -> tm'
   | abs' : string ->  ty' -> tm' -> tm'
   | app' : tm' -> tm' -> tm'
+  | fixp' : tm' -> tm'
 
   | const' : nat' -> tm'
   | succ' : tm' -> tm'.
@@ -29,6 +30,7 @@ Fixpoint lift (t:tm) : tm':=
   | var s => (var' s)
   | abs s T t => (abs' s (lift_ty T) (lift t))
   | app t1 t2 => (app' (lift t1) (lift t2))
+  | fixp t => (fixp' (lift t))
 
   | const n => (const' [(n, pc_True)])
   | succ t => (succ' (lift t))
@@ -43,6 +45,8 @@ Fixpoint subst' (x:string) (s' t': tm'): tm' :=
   | var' y => if String.eqb x y then s' else t'
   | abs' y T' t1' => if String.eqb x y then t' else abs' y T' (subst' x s' t1')
   | app' t1' t2' => app' (subst' x s' t1') (subst' x s' t2')
+  | fixp' t1' => fixp' (subst' x s' t1')
+
   | const' _ => t'
   | succ' t1' => succ' (subst' x s' t1')
   end.
@@ -53,6 +57,12 @@ Inductive step': tm' -> tm' -> Prop :=
       step' (app' t1' t2') (app' t1'' t2')
   | ST_AppAbs': forall x T' t' v',
     step' (app' (abs' x T' t') v') (subst' x v' t')
+  | ST_Fixp' : forall t1' t2',
+    step' t1' t2' ->
+    step' (fixp' t1') (fixp' t2')
+  | ST_FixpAbs': forall x T' t',
+    step' (fixp' (abs' x T' t')) (subst' x (fixp' (abs' x T' t')) t')
+
   | ST_Succ': forall t' t'',
     step' t' t'' ->
       step' (succ' t') (succ' t'')
@@ -80,6 +90,9 @@ Inductive has_type': context' -> tm' -> ty' -> Prop :=
     has_type' Gamma' t1' (Arrow' T2' T1') ->
     has_type' Gamma' t2' T2' ->
       has_type' Gamma' (app' t1' t2') T1'
+  | T_Fixp' : forall Gamma' T1' t1',
+    has_type' Gamma' t1' (Arrow' T1' T1') ->
+      has_type' Gamma' (fixp' t1') T1'
 
   | T_Nat' : forall Gamma' (n' : nat'),
     has_type' Gamma' (const' n') Nat'
@@ -144,6 +157,10 @@ Proof.
       eauto; eexists; econstructor; assumption.
     + eapply canonical_forms_fun' in Ht1 as [x0 [u' Ht1'] ]; subst;
       eauto; eexists; econstructor; assumption.
+  - right. destruct IHHt; auto.
+    + eapply canonical_forms_fun' in Ht as [x [u Ht]]; subst;
+      eauto; eexists; econstructor; assumption.
+    + destruct H; eexists; eapply ST_Fixp'; eauto.
   - right. destruct IHHt; eauto.
     + eapply canonical_forms_nat' in H as [n' H]; subst; eauto.
       eexists. apply ST_SuccConst'.
@@ -186,6 +203,10 @@ Proof.
   eapply substitution_preserves_typing';
     inversion Ht2; inversion H4; subst;
     eassumption.
+  inversion Ht; subst.
+  eapply substitution_preserves_typing'.
+    eassumption.
+    apply (T_Fixp' _ _ _ Ht).
 Qed.
 
 Lemma preservation'_multi: forall t1' t2' T',
@@ -328,6 +349,9 @@ Proof.
     eapply T_App'.
     + apply IHH_type1. exact H_equiv.
     + apply IHH_type2. exact H_equiv.
+  - (* T_Fixp' *)
+    eapply T_Fixp'.
+    apply IHH_type. exact H_equiv.
   - (* T_Nat' *)
     apply T_Nat'.
   - (* T_Succ' *)
@@ -389,6 +413,7 @@ Proof.
     + reflexivity.
     + simpl. rewrite IHbody.
       reflexivity.
+  - rewrite IHbody. reflexivity.
   - reflexivity.
   - rewrite IHbody.
     reflexivity.
@@ -414,6 +439,12 @@ Proof.
       assumption.
     + rewrite lift_subst_subst'_lift.
       apply ST_AppAbs'.
+  - inversion Hstep; subst.
+    + apply IHt1 in H0.
+      simpl. apply ST_Fixp'.
+      assumption.
+    + simpl. rewrite lift_subst_subst'_lift.
+      apply ST_FixpAbs'.
   - inversion Hstep; subst.
     + apply IHt1 in H0.
       apply ST_Succ'; assumption.
