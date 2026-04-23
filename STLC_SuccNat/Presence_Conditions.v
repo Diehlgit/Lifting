@@ -1,5 +1,5 @@
-Require Import String List.
-Import ListNotations.
+From Stdlib Require Import String List.
+Import List.ListNotations.
 
 (* A Feature is represented by a string *)
 Definition feature := string.

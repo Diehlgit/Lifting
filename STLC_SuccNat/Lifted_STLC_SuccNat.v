@@ -1,7 +1,8 @@
-Require Import String List Maps.
-Import ListNotations.
-Require Import STLC_SuccNat.
-Require Import Presence_Conditions.
+From Stdlib Require Import String List.
+Import List.ListNotations.
+Open Scope list_scope.
+From STLC Require Import STLC_SuccNat Presence_Conditions.
+Require Export Presence_Conditions.
 
 (* Automatic lifting *)
 Inductive ty' : Type :=
@@ -57,18 +58,18 @@ Inductive step': tm' -> tm' -> Prop :=
       step' (app' t1' t2') (app' t1'' t2')
   | ST_AppAbs': forall x T' t' v',
     step' (app' (abs' x T' t') v') (subst' x v' t')
+  | ST_FixpAbs': forall x T' t',
+    step' (fixp' (abs' x T' t')) (app' (abs' x T' t') (fixp' (abs' x T' t')))
   | ST_Fixp' : forall t1' t2',
     step' t1' t2' ->
     step' (fixp' t1') (fixp' t2')
-  | ST_FixpAbs': forall x T' t',
-    step' (fixp' (abs' x T' t')) (subst' x (fixp' (abs' x T' t')) t')
 
   | ST_Succ': forall t' t'',
     step' t' t'' ->
       step' (succ' t') (succ' t'')
   | ST_SuccConst': forall n',
       step' (succ' (const' n'))
-      (const' (map (fun '(n,pc) => ((S n), pc)) n')).
+      (const' (List.map (fun '(n,pc) => ((S n), pc)) n')).
 
 Definition step'_normal_form_of t' t'':=
   (multi step' t' t'' /\ normal_form step' t'').
@@ -204,9 +205,8 @@ Proof.
     inversion Ht2; inversion H4; subst;
     eassumption.
   inversion Ht; subst.
-  eapply substitution_preserves_typing'.
-    eassumption.
-    apply (T_Fixp' _ _ _ Ht).
+  constructor.
+  eassumption.
 Qed.
 
 Lemma preservation'_multi: forall t1' t2' T',
@@ -224,7 +224,7 @@ Qed.
 (* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:feat_config) (p:nat) (analysis:nat->nat),
   derive spl cfg = Some p ->
-  derive (map (fun '(n, pc) => (analysis n, pc)) spl) cfg = Some (analysis p).
+  derive (List.map (fun '(n, pc) => (analysis n, pc)) spl) cfg = Some (analysis p).
 Proof.
   induction spl;
   intros cfg p analysis Hd.
@@ -239,8 +239,8 @@ Proof.
 Qed.
 
 Lemma map_map_fst: forall {A B: Type} (l: list (A*B)) (f g: A -> A),
-  map (fun '(v2, pc2) => (g v2, pc2)) (map (fun '(v1, pc1) => (f v1, pc1)) l) =
-  map (fun '(v3, pc3) => (g (f v3), pc3)) l.
+  List.map (fun '(v2, pc2) => (g v2, pc2)) (List.map (fun '(v1, pc1) => (f v1, pc1)) l) =
+  List.map (fun '(v3, pc3) => (g (f v3), pc3)) l.
 Proof.
   induction l; intros.
   - simpl. reflexivity.
@@ -440,11 +440,9 @@ Proof.
     + rewrite lift_subst_subst'_lift.
       apply ST_AppAbs'.
   - inversion Hstep; subst.
-    + apply IHt1 in H0.
-      simpl. apply ST_Fixp'.
-      assumption.
-    + simpl. rewrite lift_subst_subst'_lift.
-      apply ST_FixpAbs'.
+    + simpl. constructor.
+    + simpl. constructor.
+      auto.
   - inversion Hstep; subst.
     + apply IHt1 in H0.
       apply ST_Succ'; assumption.

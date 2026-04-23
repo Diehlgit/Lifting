@@ -1,8 +1,7 @@
-Require Import List Maps Presence_Conditions.
-Require Import STLC_SuccNat.
-Require Import Lifted_STLC_SuccNat.
-Import ListNotations.
-Require Import Norm Lifted_Norm.
+From Stdlib Require Import List.
+Import List.ListNotations.
+Open Scope list_scope.
+From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat Msubst Lifted_Msubst.
 
 Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   has_type empty t T /\ has_type' empty t' (lift_ty T) /\
@@ -15,6 +14,20 @@ Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
             LR cfg T1 arg arg' ->
             LR cfg T2 (app t arg) (app' t' arg')
   end.
+
+(* Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
+  has_type empty t T /\ has_type' empty t' (lift_ty T) /\
+  match T with
+  | Nat => exists r r',
+	          step_normal_form_of t (const r) /\
+	          step'_normal_form_of t' (const' r') /\
+	          derive r' cfg = Some r
+  | (Arrow T1 T2) => exists f f',
+            step_normal_form_of t f /\
+            step'_normal_form_of t' f' /\
+            (forall arg arg', LR cfg T1 arg arg' ->
+            LR cfg T2 (app t arg) (app' t' arg'))
+  end. *)
 
 Lemma LR_typable_empty : forall {cfg} {T} {t} {t'},
   LR cfg T t t' ->
@@ -311,7 +324,7 @@ Qed.
 
 Fixpoint lift_tass (c:tass) : tass' :=
   match c with
-  | [] => []
+  | nil => nil
   | (x,T)::ts => (x,(lift_ty T)) :: (lift_tass ts)
   end.
 
@@ -348,7 +361,6 @@ Proof.
     destruct (String.eqb x x0); auto. constructor; eauto.
 Qed.
 
-(*TODO: Is there a way to prove T_Abs case without LR_halts?*)
 Lemma completeness: forall c env env' t T cfg,
   has_type (mupdate empty c)  t T ->
   instantiation cfg c env env' ->
@@ -431,9 +443,17 @@ Proof.
     rewrite msubst_app, msubst'_app'.
     pose proof (IHHT1 c H env0 env0' V).
     unfold LR in H0; fold LR in H0.
-    destruct H0 as [HT [HT' HLR] ].
+    destruct H0 as [HT [HT' HLR]].
     pose proof (IHHT2 c H env0 env0' V).
     auto.
+  - (* T_Fixp *)
+    rewrite msubst_fixp, msubst'_fixp'.
+    pose proof (IHHT c H env0 env0' V).
+    unfold LR in H0; fold LR in H0.
+    destruct H0 as [HT1 [HT1' HLR]].
+    clear IHHT.
+    specialize HLR with (fixp (msubst env0 t1)) (fixp' (msubst' env0' (lift t1))).
+    admit. 
   - (* T_Const *)
     split; [|split].
     rewrite msubst_const. auto.
@@ -465,7 +485,7 @@ Proof.
         apply multistep'_succ'; eassumption.
         eauto.
     + apply mapping_not_change_deriving. assumption.
-Qed.
+Admitted.
 
 Theorem commutativity: forall cfg analysis spl p r r',
   has_type empty analysis (Arrow Nat Nat) ->

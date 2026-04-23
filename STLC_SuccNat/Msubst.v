@@ -1,7 +1,7 @@
-Require Import String List Maps.
-Import ListNotations.
-Require Import STLC_SuccNat.
-Require Import Environments.
+From Stdlib Require List.
+Import List.ListNotations.
+Open Scope list_scope.
+From STLC Require Import STLC_SuccNat Environments.
 
 Hint Constructors multi : core.
 Hint Constructors value : core.
@@ -74,13 +74,13 @@ Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
    has_type Gamma t T ->
    exists T', Gamma x = Some T'.
-Proof with eauto.
+Proof.
   intros x t T Gamma Hafi Htyp.
-  induction Htyp; inversion Hafi; subst...
+  induction Htyp; inversion Hafi; subst; eauto.
   - (* T_Abs *)
-    destruct IHHtyp as [T' Hctx]... exists T'.
+    destruct IHHtyp as [T' Hctx]; eauto. exists T'.
     unfold update, t_update in Hctx.
-    false_eqb_string...
+    false_eqb_string; eauto.
 Qed.
 
 Corollary typable_empty__closed : forall t T,
@@ -94,12 +94,12 @@ Qed.
 Lemma vacuous_substitution : forall  t x,
      ~ appears_free_in x t  ->
      forall t', subst x t' t = t.
-Proof with eauto.
+Proof.
   induction t; intros x Hnafi t';
     simpl; eauto.
   - (* Var *)
     rename s into y. destruct (eqb_spec x y); simpl.
-    exfalso. subst...
+    exfalso. subst; eauto.
     reflexivity.
   - (* App *)
     rewrite IHt1, IHt2.
@@ -111,11 +111,11 @@ Proof with eauto.
     reflexivity.
     f_equal. apply IHt.
     intros H. apply Hnafi.
-    apply afi_abs...
+    apply afi_abs; eauto.
   - (* Fixp *)
-    rewrite IHt...
+    rewrite IHt; eauto.
   - (* Subst *)
-    rewrite IHt...
+    rewrite IHt; eauto.
 Qed.
 
 Lemma subst_closed: forall t,
@@ -139,24 +139,24 @@ Fixpoint closed_env (env:env) :=
 
 Lemma subst_not_afi : forall t x v,
     closed v ->  ~ appears_free_in x (subst x v t).
-Proof with eauto.  (* rather slow this way *)
+Proof.  (* rather slow this way *)
   unfold closed, not.
   induction t; intros x v P A; simpl in A.
     - (* var *)
-     destruct (eqb_spec x s)...
+     destruct (eqb_spec x s); eauto.
      inversion A; subst. auto.
     - (* app *)
-     inversion A; subst...
+     inversion A; subst; eauto.
     - (* abs *)
-     destruct (eqb_spec x s)...
-     + inversion A; subst...
-     + inversion A; subst...
+     destruct (eqb_spec x s); eauto.
+     + inversion A; subst; eauto.
+     + inversion A; subst; eauto.
     - (* fixp *)
-     inversion A; subst...
+     inversion A; subst; eauto.
     - (* const *)
      inversion A.
     - (* succ *)
-     inversion A; subst...
+     inversion A; subst; eauto.
 Qed.
 
 Lemma duplicate_subst : forall t' x t v,
@@ -173,25 +173,25 @@ Proof with eauto.
  induction t; intros; simpl.
   - (* var *)
    destruct (eqb_spec x s); destruct (eqb_spec x1 s).
-   + subst. exfalso...
-   + subst. simpl. rewrite String.eqb_refl. apply subst_closed...
-   + subst. simpl. rewrite String.eqb_refl. rewrite subst_closed...
-   + simpl. apply eqb_neq in n, n0. rewrite n, n0...
+   + subst. exfalso; eauto.
+   + subst. simpl. rewrite String.eqb_refl. apply subst_closed; eauto.
+   + subst. simpl. rewrite String.eqb_refl. rewrite subst_closed; eauto.
+   + simpl. apply eqb_neq in n, n0. rewrite n, n0; eauto.
   - (* app *)
-   rewrite IHt1, IHt2...
+   rewrite IHt1, IHt2; eauto.
   - (* abs *)
    destruct (eqb_spec x s); destruct (eqb_spec x1 s).
-   + subst. exfalso...
-   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n...
-   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n...
-   + simpl. apply eqb_neq in n, n0; rewrite n, n0...
-     rewrite IHt...
+   + subst. exfalso; eauto.
+   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n; eauto.
+   + subst. simpl. rewrite eqb_refl. apply eqb_neq in n; rewrite n; eauto.
+   + simpl. apply eqb_neq in n, n0; rewrite n, n0; eauto.
+     rewrite IHt; eauto.
   - (* fixp *)
-    rewrite IHt...
+    rewrite IHt; eauto.
   - (* const *)
    reflexivity.
   - (* succ *)
-   rewrite IHt...
+   rewrite IHt; eauto.
 Qed.
 
 Lemma subst_msubst: forall env x v t, closed v -> closed_env env ->

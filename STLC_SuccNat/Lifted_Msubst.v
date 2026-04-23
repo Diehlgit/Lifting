@@ -1,8 +1,4 @@
-Require Import String List Maps.
-Import ListNotations.
-Require Import STLC_SuccNat.
-Require Import Lifted_STLC_SuccNat.
-Require Import Environments.
+From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat Environments.
 
 Hint Constructors multi : core.
 Hint Constructors value' : core.
@@ -75,13 +71,13 @@ Lemma free_in_context' : forall x t' T' Gamma',
    appears_free_in' x t' ->
    has_type' Gamma' t' T' ->
    exists T1', Gamma' x = Some T1'.
-Proof with eauto.
+Proof.
   intros x t T Gamma Hafi Htyp.
-  induction Htyp; inversion Hafi; subst...
+  induction Htyp; inversion Hafi; subst; eauto.
   - (* T_Abs' *)
-    destruct IHHtyp as [T' Hctx]... exists T'.
+    destruct IHHtyp as [T' Hctx]; eauto. exists T'.
     unfold update, t_update in Hctx.
-    rewrite false_eqb_string in Hctx...
+    rewrite false_eqb_string in Hctx; eauto.
 Qed.
 
 Corollary typable_empty__closed' : forall t' T',
@@ -100,23 +96,23 @@ Proof with eauto.
     simpl; eauto.
   - (* Var' *)
     rename s into y. destruct (eqb_spec x y); simpl.
-    exfalso. subst...
+    exfalso. subst; eauto.
     reflexivity.
   - (* Abs' *)
     rename s into y. destruct (eqb_spec x y); simpl.
     reflexivity.
     f_equal. apply IHt'.
     intros H. apply Hnafi.
-    apply afi_abs'...
+    apply afi_abs'; eauto.
  - (* App' *)
     rewrite IHt'1, IHt'2.
     reflexivity.
     intros H; eauto.
     intros H; eauto.
  - (* Fixp' *)
-    rewrite IHt'...
+    rewrite IHt'; eauto.
  - (* Succ' *)
-    rewrite IHt'...
+    rewrite IHt'; eauto.
 Qed.
 
 Lemma subst'_closed': forall t',
@@ -140,24 +136,24 @@ Fixpoint closed'_env' (env':env') :=
 
 Lemma subst'_not_afi' : forall t' x v',
     closed' v' ->  ~ appears_free_in' x (subst' x v' t').
-Proof with eauto.  (* rather slow this way *)
+Proof.  (* rather slow this way *)
   unfold closed', not.
   induction t'; intros x v P A; simpl in A.
     - (* var' *)
-     destruct (eqb_spec x s)...
+     destruct (eqb_spec x s); eauto.
      inversion A; subst. auto.
     - (* abs' *)
-     destruct (eqb_spec x s)...
-     + inversion A; subst...
-     + inversion A; subst...
+     destruct (eqb_spec x s); eauto.
+     + inversion A; subst; eauto.
+     + inversion A; subst; eauto.
     - (* app' *)
-     inversion A; subst...
+     inversion A; subst; eauto.
     - (* fixp' *)
-     inversion A; subst...
+     inversion A; subst; eauto.
     - (* const' *)
      inversion A.
     - (* succ' *)
-     inversion A; subst...
+     inversion A; subst; eauto.
 Qed.
 
 Lemma duplicate_subst' : forall t1' x t' v',
@@ -170,29 +166,29 @@ Lemma swap_subst' : forall t' x x1 v' v1',
     x <> x1 ->
     closed' v' -> closed' v1' ->
     (subst' x1 v1' (subst' x v' t')) = (subst' x v'(subst' x1 v1' t')).
-Proof with eauto.
+Proof.
  induction t'; intros; simpl.
   - (* var' *)
    destruct (eqb_spec x s); destruct (eqb_spec x1 s).
-   + subst. exfalso...
-   + subst. simpl. rewrite String.eqb_refl. apply subst'_closed'...
-   + subst. simpl. rewrite String.eqb_refl. rewrite subst'_closed'...
-   + simpl. rewrite false_eqb_string... rewrite false_eqb_string...
+   + subst. exfalso; eauto.
+   + subst. simpl. rewrite String.eqb_refl. apply subst'_closed'; eauto.
+   + subst. simpl. rewrite String.eqb_refl. rewrite subst'_closed'; eauto.
+   + simpl. rewrite false_eqb_string; eauto. rewrite false_eqb_string; eauto.
   - (* abs' *)
    destruct (eqb_spec x s); destruct (eqb_spec x1 s).
-   + subst. exfalso...
-   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string...
-   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string...
-   + simpl. rewrite false_eqb_string... rewrite false_eqb_string...
-     rewrite IHt'...
+   + subst. exfalso; eauto.
+   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string; eauto.
+   + subst. simpl. rewrite eqb_refl. rewrite false_eqb_string; eauto.
+   + simpl. rewrite false_eqb_string; eauto. rewrite false_eqb_string; eauto.
+     rewrite IHt'; eauto.
   - (* app' *)
-   rewrite IHt'1, IHt'2...
+   rewrite IHt'1, IHt'2; eauto.
   - (* fixp' *)
-   rewrite IHt'...
+   rewrite IHt'; eauto.
   - (* const' *)
    reflexivity.
   - (* succ' *)
-   rewrite IHt'...
+   rewrite IHt'; eauto.
 Qed.
 
 Lemma subst'_msubst': forall env' x v' t', closed' v' -> closed'_env' env' ->

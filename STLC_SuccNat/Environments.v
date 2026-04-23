@@ -1,7 +1,6 @@
-Require Import String List Maps.
-Import ListNotations.
-Require Import Lifted_STLC_SuccNat.
-Require Import STLC_SuccNat.
+From Stdlib Require Import String List.
+Import List.ListNotations.
+From STLC Require Import Maps Lifted_STLC_SuccNat STLC_SuccNat.
 
 
 Definition env := list (string * tm).

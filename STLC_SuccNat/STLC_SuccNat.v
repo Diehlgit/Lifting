@@ -1,4 +1,5 @@
-Require Import Maps.
+From STLC Require Import Maps.
+Require Export Maps.
 
 (* Terms and Values *)
 Inductive ty : Type :=
@@ -43,11 +44,11 @@ Inductive step : tm -> tm -> Prop :=
       step (app t1 t2) (app t1' t2)
   | ST_AppAbs: forall x T t1 t2,
     step (app (abs x T t1) t2) (subst x t2 t1)
+  | ST_FixpAbs: forall x T t1,
+    step (fixp (abs x T t1)) (app (abs x T t1) (fixp (abs x T t1)))
   | ST_Fixp: forall t1 t2,
     step t1 t2 ->
       step (fixp t1) (fixp t2)
-  | ST_FixpAbs: forall x T t1,
-    step (fixp (abs x T t1)) (subst x (fixp (abs x T t1)) t1)
 
   | ST_Succ: forall t1 t1',
     step t1 t1' ->
@@ -239,9 +240,7 @@ Proof.
     inversion Ht2; inversion H4; subst;
     try eassumption.
   inversion Ht; subst.
-  eapply substitution_preserves_typing.
-    eassumption.
-    apply (T_Fixp _ _ _ Ht).
+  constructor. assumption.
 Qed.
 
 Lemma preservation_multi: forall t t' T,
@@ -318,4 +317,55 @@ Proof.
     apply multi_refl.
     eapply multi_step.
       apply ST_Fixp; eauto. auto.
+Qed.
+
+Lemma multistep_app: forall t1 t2 t3,
+  multi step t1 t2 -> multi step (app t1 t3) (app t2 t3).
+Proof.
+  intros t1 t2 t3 STM. induction STM.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_App; eauto. auto.
+Qed.
+
+Lemma wt_nf__value: forall t T v,
+  has_type empty t T ->
+    step_normal_form_of t v <->
+    multi step t v /\ value v.
+Proof.
+  intros t T v HT. split.
+  - intros [Hms Hnf].
+    split; auto.
+    apply (preservation_multi _ _ _ HT) in Hms.
+    apply progress in Hms as [].
+    + assumption.
+    + exfalso. apply Hnf. assumption.
+  - intros [Hms Hv]. split.
+    + assumption.
+    + intros [x contra]. value_no_step.
+Qed.
+
+Lemma app_fun_normalizes_first: forall t1 t2 t3 T,
+  has_type empty (app t1 t2) T ->
+  step_normal_form_of (app t1 t2) t3 ->
+    exists x T u, multi step t1 (abs x T u).
+Proof.
+  intros t1 t2 t3 T Htype Hnf.
+  apply (wt_nf__value _ _ _ Htype) in Hnf as [Hmulti Hval]; auto.
+  remember (app t1 t2) as t.
+  generalize dependent t2.
+  generalize dependent t1.
+
+  induction Hmulti; intros t1' t2' Heqt.
+  - rewrite Heqt in Hval. inversion Hval.
+  - subst x.
+    inversion H; subst.
+    (* ST_App *)
+    + edestruct IHHmulti as [x [T0 [u Hsteps]]]; auto.
+      eapply (preservation _ _ _ Htype) in H. assumption.
+      repeat eexists.
+      eapply multi_step; eauto.
+    (* ST_AppAbs *)
+    + exists x, T0, t1.
+      apply multi_refl.
 Qed.
