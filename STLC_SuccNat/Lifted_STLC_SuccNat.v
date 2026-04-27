@@ -469,3 +469,64 @@ Proof.
    eapply multi_step.
      apply ST_Succ'; eauto.  auto.
 Qed.
+
+Lemma multistep'_fixp' : forall t1' t2',
+  multi step' t1' t2' -> multi step' (fixp' t1') (fixp' t2').
+Proof.
+  intros t1' t2' STM. induction STM.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_Fixp'; eauto. auto.
+Qed.
+
+Lemma multistep'_app': forall t1' t2' t3',
+  multi step' t1' t2' -> multi step' (app' t1' t3') (app' t2' t3').
+Proof.
+  intros t1' t2' t3' STM. induction STM.
+    apply multi_refl.
+    eapply multi_step.
+      apply ST_App'; eauto. auto.
+Qed.
+
+Lemma wt_nf__value': forall t' T' v',
+  has_type' empty t' T' ->
+    step'_normal_form_of t' v' <->
+    multi step' t' v' /\ value' v'.
+Proof.
+  intros t' T' v' HT. split.
+  - intros [Hms Hnf].
+    split; auto.
+    apply (preservation'_multi _ _ _ HT) in Hms.
+    apply progress' in Hms as [].
+    + assumption.
+    + exfalso. apply Hnf. assumption.
+  - intros [Hms Hv]. split.
+    + assumption.
+    + intros [x contra]. value'_no_step.
+Qed.
+
+Lemma st_pr_nf': forall t1' t2' nf',
+  step' t1' t2' ->
+  step'_normal_form_of t1' nf' ->
+  step'_normal_form_of t2' nf'.
+Proof.
+  intros.
+  destruct H0.
+  split; [|assumption].
+  inversion H0; subst.
+  - exfalso. eauto.
+  - pose proof (determinism' _ _ _ H H2). 
+    subst. assumption.
+Qed.
+
+Lemma st_exp_pr_nf': forall t1' t2' nf',
+  step' t1' t2' ->
+  step'_normal_form_of t2' nf' ->
+  step'_normal_form_of t1' nf'.
+Proof.
+  intros.
+  destruct H0.
+  split; [|assumption].
+  inversion H0; subst;
+    eapply multi_step; eassumption.
+Qed.

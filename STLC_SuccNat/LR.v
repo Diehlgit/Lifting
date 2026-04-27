@@ -3,7 +3,7 @@ Import List.ListNotations.
 Open Scope list_scope.
 From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat Msubst Lifted_Msubst.
 
-Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
+(* Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   has_type empty t T /\ has_type' empty t' (lift_ty T) /\
   match T with
   | Nat => exists r r',
@@ -13,9 +13,9 @@ Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   | (Arrow T1 T2) => forall arg arg',
             LR cfg T1 arg arg' ->
             LR cfg T2 (app t arg) (app' t' arg')
-  end.
+  end. *)
 
-(* Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
+Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
   has_type empty t T /\ has_type' empty t' (lift_ty T) /\
   match T with
   | Nat => exists r r',
@@ -27,7 +27,7 @@ Fixpoint LR (cfg:feat_config) (T:ty) (t:tm) (t':tm') : Prop :=
             step'_normal_form_of t' f' /\
             (forall arg arg', LR cfg T1 arg arg' ->
             LR cfg T2 (app t arg) (app' t' arg'))
-  end. *)
+  end.
 
 Lemma LR_typable_empty : forall {cfg} {T} {t} {t'},
   LR cfg T t t' ->
@@ -44,18 +44,21 @@ Proof.
  induction T;  intros cfg t1 t2 t' E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
-  - split; [|split].
-    eapply preservation; eauto.
-    assumption.
+  - split; [|split]; auto.
+    eapply preservation; eassumption.
     clear Hty Hty'.
+    destruct H as [f [f' [Hsnf [Hsnf' H]]]].
+    exists f, f'.
+    apply (st_pr_nf _ _ _ E) in Hsnf.
+    split; [eassumption| split; [eassumption|]].
     intros.
     eapply IHT2.
-    apply ST_App. apply E.
+    eapply ST_App. eassumption.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
-    eapply preservation; eauto.
-    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    eapply preservation; eassumption.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
     exists r, r'. split; [|split]; auto.
     clear Hsnf' Hd Hty Hty'.
     destruct Hsnf as [Hms _].
@@ -72,18 +75,21 @@ Proof.
  induction T;  intros cfg t t1' t2' E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
-  - split; [|split].
-    assumption.
+  - split; [|split]; auto.
     eapply preservation'; eauto.
     clear Hty Hty'.
+    destruct H as [f [f' [Hsnf [Hsnf' H]]]].
+    exists f, f'.
+    apply (st_pr_nf' _ _ _ E) in Hsnf'.
+    split; [eassumption| split; [eassumption|]].
     intros.
     eapply IHT2.
-    apply ST_App'. apply E.
+    apply ST_App'. eassumption.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
-    eapply preservation'; eauto.
-    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    eapply preservation'; eassumption.
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
     exists r, r'. split; [|split]; auto.
     clear Hsnf Hd Hty Hty'.
     destruct Hsnf' as [Hms' _].
@@ -103,10 +109,11 @@ Proof.
  induction T;  intros cfg t1 t2 t' HT E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
-  - split; [|split].
-    auto.
-    assumption.
-    clear Hty'.
+  - split; [|split]; auto.
+    destruct H as [f [f' [Hsnf [Hsnf' H]]]].
+    exists f, f'.
+    apply (st_exp_pr_nf _ _ _ E) in Hsnf.
+    split; [eassumption| split;[eassumption|]].
     intros.
     eapply IHT2.
     eapply T_App. eauto.
@@ -115,7 +122,7 @@ Proof.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
-    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
     exists r, r'. split; [|split]; auto.
     clear Hsnf' Hd Hty Hty'.
     destruct Hsnf as [Hms _].
@@ -131,10 +138,12 @@ Proof.
  induction T;  intros cfg t t1' t2' HT E Rt;
                destruct Rt as [Hty [Hty' H] ].
   (* Arrow *)
-  - split; [|split].
-    auto.
-    assumption.
+  - split; [|split]; auto.
     clear Hty'.
+    destruct H as [f [f' [Hsnf [Hsnf' H]]]].
+    exists f, f'.
+    apply (st_exp_pr_nf' _ _ _ E) in Hsnf'.
+    split; [eassumption| split; [eassumption|]].
     intros.
     eapply IHT2.
     eapply T_App'. eauto.
@@ -143,7 +152,7 @@ Proof.
     apply H. assumption.
   (* Nat *)
   - split; [|split]; auto.
-    destruct H as [r [r' [Hsnf [Hsnf' Hd] ] ] ].
+    destruct H as [r [r' [Hsnf [Hsnf' Hd]]]].
     exists r, r'. split; [|split]; auto.
     clear Hsnf Hd Hty Hty'.
     destruct Hsnf' as [Hms' _].
@@ -229,14 +238,14 @@ Lemma soundness: forall cfg analysis,
   ).
 Proof.
   intros cfg analysis HLR spl p r' r Hd Hsnf Hsnf'.
-  unfold LR in HLR. destruct HLR as [HT [HT' HLR] ].
+  unfold LR in HLR. destruct HLR as [HT [HT' [f [f' [_ [_ HLR]]]]]].
   specialize HLR with (arg:=(const p)) (arg':=(const' spl)).
   destruct HLR.
   { split; [|split]; auto.
     exists p, spl; split; [|split];
       try (split;[apply multi_refl| intros [x contra]; inversion contra]);
       assumption. }
-  destruct H0 as [_ [r0 [r0' [Hsnf0 [Hsnf0' Hd0'] ] ] ] ].
+  destruct H0 as [_ [r0 [r0' [Hsnf0 [Hsnf0' Hd0']]]]].
 
   apply (normal_forms_unique _ _ _ Hsnf0) in Hsnf.
   injection Hsnf as Hsnf; subst.
@@ -418,6 +427,11 @@ Proof.
         unfold update, t_update.
         destruct (String.eqb s x0); auto. }
      split; [|split]; auto.
+     exists (abs x T2 (msubst (drop x env0) t)),
+            (abs' x (lift_ty T2) (msubst' (drop x env0') (lift t))).
+     repeat split;
+      try apply multi_refl;
+      try (intros [x0 contra]; inversion contra).
      intros. specialize IHHT with (c:=((x,T2)::c)).
      assert (forall x0 : string, (x) |-> T2; Gamma x0 = lookup x0 ((x, T2) :: c)).
      { intros. unfold update, t_update, lookup. destruct (String.eqb x x0); auto. }
@@ -443,18 +457,35 @@ Proof.
     rewrite msubst_app, msubst'_app'.
     pose proof (IHHT1 c H env0 env0' V).
     unfold LR in H0; fold LR in H0.
-    destruct H0 as [HT [HT' HLR]].
+    destruct H0 as [HT [HT' [f [f' [_ [_ HLR]]]]]].
     pose proof (IHHT2 c H env0 env0' V).
     auto.
   - (* T_Fixp *)
     rewrite msubst_fixp, msubst'_fixp'.
     pose proof (IHHT c H env0 env0' V).
     unfold LR in H0; fold LR in H0.
-    destruct H0 as [HT1 [HT1' HLR]].
+    destruct H0 as [HT1 [HT1' [f [f' [Hf [Hf' HLR]]]]]].
     clear IHHT.
-    specialize HLR with (fixp (msubst env0 t1)) (fixp' (msubst' env0' (lift t1))).
-    admit. 
-  - (* T_Const *)
+    eapply mstep_mstep'__preserves_LR' with (fixp f) (fixp' f');
+      try eauto.
+    eapply multistep_fixp. apply Hf.
+    eapply multistep'_fixp'. apply Hf'.
+    destruct Hf. 
+    pose proof (preservation_multi _ f _ HT1 H0).
+    pose proof (wt_nf__value _ _ f HT1) as [H3 _].
+    destruct H3 as [_ H3].
+      split; assumption.
+    pose proof (canonical_forms_fun f T1 T1 H2 H3)
+      as [x0 [u H4]]. subst. clear H3 H2 H1.
+    destruct Hf'. 
+    pose proof (preservation'_multi _ f' _ HT1' H1).
+    pose proof (wt_nf__value' _ _ f' HT1') as [H4 _].
+    destruct H4 as [_ H4].
+      split; assumption.
+    pose proof (canonical_forms_fun' f' (lift_ty T1) (lift_ty T1) H3 H4)
+      as [x0' [u' H5]]. subst. clear H4 H3 H2.
+    
+    - (* T_Const *)
     split; [|split].
     rewrite msubst_const. auto.
     rewrite msubst'_const'. auto.

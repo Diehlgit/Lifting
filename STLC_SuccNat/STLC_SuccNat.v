@@ -369,3 +369,29 @@ Proof.
     + exists x, T0, t1.
       apply multi_refl.
 Qed.
+
+Lemma st_pr_nf: forall t1 t2 nf,
+  step t1 t2 ->
+  step_normal_form_of t1 nf ->
+  step_normal_form_of t2 nf.
+Proof.
+  intros.
+  destruct H0.
+  split; [|assumption].
+  inversion H0; subst.
+  - exfalso. eauto.
+  - pose proof (determinism _ _ _ H H2). 
+    subst. assumption.
+Qed.
+
+Lemma st_exp_pr_nf: forall t1 t2 nf,
+  step t1 t2 ->
+  step_normal_form_of t2 nf ->
+  step_normal_form_of t1 nf.
+Proof.
+  intros.
+  destruct H0.
+  split; [|assumption].
+  inversion H0; subst;
+    eapply multi_step; eassumption.
+Qed.

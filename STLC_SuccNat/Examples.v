@@ -1,8 +1,8 @@
-Require Import List String.
+From Stdlib Require Import List String.
+Import List.ListNotations.
 Require Import Presence_Conditions.
 
-Import ListNotations.
-
+Open Scope list_scope.
 Open Scope string_scope.
 
 (* Presence Condition Evaluation Examples *)
@@ -48,7 +48,7 @@ Example plusone_0_is_1:
 Proof.
   split.
   - eapply multi_step.
-    + apply ST_AppAbs. apply v_nat.
+    + apply ST_AppAbs.
     + eapply multi_step.
       * simpl. eapply ST_SuccConst.
       * apply multi_refl.
@@ -60,7 +60,7 @@ Example plustwo_3_is_5:
 Proof.
   split.
   - eapply multi_step.
-    + apply ST_AppAbs. apply v_nat.
+    + apply ST_AppAbs.
     + eapply multi_step.
       * simpl. eapply ST_Succ. apply ST_SuccConst.
       * eapply multi_step.
@@ -126,7 +126,7 @@ Proof.
     try (solve_by_inverts 1).
   inversion H2; subst;
     try (solve_by_inverts 1).
-  clear Hmstep H0 H H6 H2 H1.
+  clear Hmstep H0 H H2 H1.
 
   (*Trying to simplify Hmstep'*)
   inversion Hmstep'; subst.
@@ -171,7 +171,7 @@ Proof.
     clear H H0.
   inversion H1; subst;
     try solve_by_inverts 1.
-  clear H1 H6.
+  clear H1.
 
   (*Simplifying Hmstep' to find value of n'*)
   inversion Hmstep'; subst.
@@ -216,7 +216,7 @@ Proof.
     clear H H0.
   inversion H1; subst;
     try solve_by_inverts 1.
-  clear H1 H6.
+  clear H1.
 
   (*Simplifying Hmstep' to find value of n'*)
   inversion Hmstep'; subst.
@@ -244,8 +244,7 @@ Proof.
 
   inversion Hmstep; subst.
   inversion H; subst;
-    try solve_by_inverts 1;
-    clear H6.
+    try solve_by_inverts 1.
   simpl in H.
   inversion H0; subst.
   inversion H1; subst;
@@ -258,7 +257,7 @@ Proof.
   inversion Hmstep'; subst.
   inversion H; subst;
     try solve_by_inverts 1;
-    clear H H6.
+    clear H.
     simpl in H0.
   inversion H0; subst.
   inversion H; subst;
@@ -369,11 +368,11 @@ Proof.
     inversion H; subst.
     inversion H0; subst;
       try solve_by_inverts 1.
-    clear H7 H0 H IHn.
+    clear H0 H IHn.
     rewrite subst_gen_plusn in H1.
 
     eapply multi_step.
-    + apply ST_AppAbs. apply v_nat.
+    + apply ST_AppAbs.
     + rewrite subst_gen_plusn. simpl.
       assert (H: step_normal_form_of (gen_plusn n (const k)) (const (n + k))).
       { split. exact H1. intros [t contra]; inversion contra. }
@@ -391,7 +390,7 @@ Proof.
   intros. induction n;
   split; try (intros [t contra]; inversion contra).
   - eapply multi_step; simpl.
-    + apply ST_AppAbs'. apply v_nat'.
+    + apply ST_AppAbs'.
     + simpl. assert(Hk: (map (fun '(n0, pc0) => (n0, pc0)) k) = k).
       { induction k. reflexivity.
         simpl. f_equal.
@@ -403,11 +402,11 @@ Proof.
     inversion H; subst.
     inversion H0; subst;
       try solve_by_inverts 1.
-    clear H7 H0 H IHn.
+    clear H0 H IHn.
     rewrite subst'_gen_plusn in H1.
 
     eapply multi_step.
-    + apply ST_AppAbs'. apply v_nat'.
+    + apply ST_AppAbs'.
     + rewrite subst'_gen_plusn. simpl.
       assert (H: step'_normal_form_of (gen_plusn' n (const' k))
         (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k))).
@@ -452,7 +451,7 @@ Proof.
   exact Hd.
 Qed.
 
-Require Import Norm Lifted_Norm LR.
+From STLC Require Import Msubst Lifted_Msubst LR.
 
 (* LR examples *)
 
@@ -466,11 +465,17 @@ Proof.
   split; [|split].
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step_trans.
-      eapply multistep_App2; eauto.
-      normalize.
+    normalize. simpl.
+    eapply multi_step_trans.
+    eapply multistep_succ.
+    eassumption.
+    normalize.
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step'_trans.
-      eapply multistep'_App2'; eauto.
+      normalize. simpl.
+      eapply multi_step'_trans.
+      eapply multistep'_succ'.
+      eassumption.
       normalize.
   - eapply mapping_not_change_deriving. assumption.
 Qed.
@@ -485,8 +490,11 @@ Proof.
   split; [|split].
   - split; [|intros [x contra]; inversion contra].
     eapply multi_step_trans.
-      eapply multistep_App2; eauto.
-      eapply multi_step.
+    normalize. simpl.
+    eapply multi_step_trans.
+    repeat eapply multistep_succ.
+    eassumption.
+    normalize.
       auto. simpl. eapply multi_step.
       auto. eapply multi_step.
       auto. apply multi_refl.
