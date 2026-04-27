@@ -25,6 +25,8 @@ Graphs/
 
 # Ignore local Makefile config
 Makefile.conf
+STLC_SuccNat/_RocqMakefile.conf
+STLC_SuccNat/_RocqMakefile
 
 # Ignore .Makefile.d files in subdirectories
 **/.Makefile.d
