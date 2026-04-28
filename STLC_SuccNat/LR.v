@@ -463,6 +463,7 @@ Proof.
   - (* T_Fixp *)
     rewrite msubst_fixp, msubst'_fixp'.
     pose proof (IHHT c H env0 env0' V).
+    pose proof (IHHT c H env0 env0' V).
     unfold LR in H0; fold LR in H0.
     destruct H0 as [HT1 [HT1' [f [f' [Hf [Hf' HLR]]]]]].
     clear IHHT.
@@ -472,19 +473,35 @@ Proof.
     eapply multistep'_fixp'. apply Hf'.
     destruct Hf. 
     pose proof (preservation_multi _ f _ HT1 H0).
-    pose proof (wt_nf__value _ _ f HT1) as [H3 _].
-    destruct H3 as [_ H3].
-      split; assumption.
-    pose proof (canonical_forms_fun f T1 T1 H2 H3)
-      as [x0 [u H4]]. subst. clear H3 H2 H1.
-    destruct Hf'. 
-    pose proof (preservation'_multi _ f' _ HT1' H1).
-    pose proof (wt_nf__value' _ _ f' HT1') as [H4 _].
+    pose proof (wt_nf__value _ _ f HT1) as [H4 _].
     destruct H4 as [_ H4].
       split; assumption.
-    pose proof (canonical_forms_fun' f' (lift_ty T1) (lift_ty T1) H3 H4)
-      as [x0' [u' H5]]. subst. clear H4 H3 H2.
-    
+    pose proof (canonical_forms_fun f T1 T1 H3 H4)
+      as [x0 [u H5]]. subst. clear H4 H3 H2.
+    destruct Hf'. 
+    pose proof (preservation'_multi _ f' _ HT1' H2).
+    pose proof (wt_nf__value' _ _ f' HT1') as [H5 _].
+    destruct H5 as [_ H5].
+      split; assumption.
+    pose proof (canonical_forms_fun' f' (lift_ty T1) (lift_ty T1) H4 H5)
+      as [x0' [u' H6]]. subst. clear H5 H4 H3.
+    apply (mstep_mstep'__preserves_LR _ _ _ _ _ _ H0 H2) in H1.
+    assert (forall arg arg', LR cfg T1 arg arg' ->
+              LR cfg T1 (app (abs x0 T1 u) arg)
+                        (app' (abs' x0' (lift_ty T1) u') arg')).
+    { intros.
+      eapply mstep_mstep'__preserves_LR.
+      eapply multistep_app. eassumption.
+      eapply multistep'_app'. eassumption.
+      apply HLR. assumption. }
+    clear HLR.
+    eapply LR_typable_empty in H1 as [HT2 HT2'].
+    eapply mstep_mstep'__preserves_LR'.
+    constructor; assumption.
+    constructor; assumption.
+    eapply multi_step. apply ST_FixpAbs. apply multi_refl.
+    eapply multi_step. apply ST_FixpAbs'. apply multi_refl.
+    apply H3.
     - (* T_Const *)
     split; [|split].
     rewrite msubst_const. auto.
