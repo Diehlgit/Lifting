@@ -345,6 +345,28 @@ Proof.
     + intros [x contra]. value_no_step.
 Qed.
 
+Lemma succ_arg_normalizes_first: forall t1 t2 T,
+  has_type empty (succ t1) T ->
+  step_normal_form_of (succ t1) t2 ->
+    exists n, multi step t1 (const n).
+Proof.
+  intros t1 t2 T HT Hnf.
+  apply (wt_nf__value _ _ _ HT) in Hnf as [Hmulti Hval]; auto.
+  remember (succ t1) as t.
+  generalize dependent t1.
+
+  induction Hmulti; intros t11 Heqt.
+  - rewrite Heqt in Hval. inversion Hval.
+  - subst x.
+    inversion H; subst.
+    (* ST_Succ *)
+    + edestruct IHHmulti as [n Hsteps]; auto.
+      eapply (preservation _ _ _ HT) in H. assumption.
+      eexists. eapply multi_step; eauto.
+    (* ST_SuccConst *)
+    + exists n. apply multi_refl.
+Qed.
+
 Lemma app_fun_normalizes_first: forall t1 t2 t3 T,
   has_type empty (app t1 t2) T ->
   step_normal_form_of (app t1 t2) t3 ->

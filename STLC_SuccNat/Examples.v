@@ -451,7 +451,37 @@ Proof.
   exact Hd.
 Qed.
 
-From STLC Require Import Msubst Lifted_Msubst LR.
+(* LR Counter Example *)
+
+Print plusone.
+Example wt_plusone:
+  has_type empty plusone (Arrow Nat Nat).
+Proof. repeat constructor. Qed.
+
+Check wt_plusone.
+
+Definition fixp_plusone := fixp plusone.
+
+Example wt_fixp_plusone:
+  has_type empty fixp_plusone Nat.
+Proof. constructor. apply wt_plusone. Qed.
+
+(* Above we hava a well typed term.
+   Even though it has a subterm which should
+   belong to LR, since this term does not terminate
+   it should not belong to LR. *)
+
+Example fixp_plusone_fails:
+  exists v, step_normal_form_of fixp_plusone v.
+Proof.
+  eexists. split.
+  - unfold fixp_plusone, plusone.
+    eapply multi_step; [apply ST_FixpAbs|].
+    eapply multi_step; [apply ST_AppAbs|].
+    simpl. (* And so on, forever ... *)
+Abort.
+
+(* From STLC Require Import Msubst Lifted_Msubst LR. *)
 
 (* LR examples *)
 

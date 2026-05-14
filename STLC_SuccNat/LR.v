@@ -538,6 +538,7 @@ Admitted.
 Theorem commutativity: forall cfg analysis spl p r r',
   has_type empty analysis (Arrow Nat Nat) ->
   derive spl cfg = Some p ->
+  (* ceval n (app analysis (const p)) (const r) *)
   step_normal_form_of (app analysis (const p)) (const r) ->
   step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
   derive r' cfg = Some r.
