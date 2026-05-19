@@ -14,7 +14,7 @@ Fixpoint cstep (t:tm) : tm :=
   | fixp t => fixp (cstep t)
   end.
 
-Compute cstep (succ (succ (const 1))).
+(* Compute cstep (succ (succ (const 1))). *)
 
 Fixpoint mcstep (i:nat) (t:tm) : option tm :=
   match t with
@@ -27,14 +27,14 @@ Fixpoint mcstep (i:nat) (t:tm) : option tm :=
     end
   end.
 
-Compute cstep (cstep (succ (succ (const 1)))).
-Compute mcstep 2 (succ (succ (const 1))).
+(* Compute cstep (cstep (succ (succ (const 1)))). *)
+(* Compute mcstep 2 (succ (succ (const 1))). *)
 
-Compute cstep (cstep (app (abs "x" Nat (succ (var "x"))) (const 4))).
-Compute mcstep 2 (app (abs "x" Nat (succ (var "x"))) (const 4)).
+(* Compute cstep (cstep (app (abs "x" Nat (succ (var "x"))) (const 4))). *)
+(* Compute mcstep 2 (app (abs "x" Nat (succ (var "x"))) (const 4)). *)
 
-Compute mcstep 0 (var "x").
-Compute mcstep 0 (succ (const 1)).
+(* Compute mcstep 0 (var "x"). *)
+(* Compute mcstep 0 (succ (const 1)). *)
 
 Lemma step__cstep: forall t1 t2,
   step t1 t2 -> cstep t1 = t2.
@@ -157,81 +157,33 @@ Proof.
   eassumption.
 Qed.
 
-Lemma mcstep_succ: forall i t n,
-  mcstep i t = Some (const n) ->
-  mcstep (S i) (succ t) = Some (const (S n)).
+Lemma mcstep_Si: forall i t v,
+  mcstep (S i) t = Some v <->
+  mcstep i (cstep t) = Some v.
 Proof.
-  intros. unfold mcstep.
-  destruct (cstep (succ t)) eqn:Eq;
-  rewrite <- Eq; fold mcstep;
-  try (simpl; destruct (match t with
-            | const n0 => const (S n0)
-            | _ => succ (cstep t)
-            end) eqn:Eqt;
-      try (destruct t; discriminate)).
-  - destruct i; destruct t;
-    try discriminate;
-      (simpl in H; injection H as H;
-      injection Eqt as Eqt;
-      subst; reflexivity).
-  - induction i; destruct t;
-    try discriminate.
-    + injection Eq as Eq.
-      simpl in H. rewrite Eq in H.
-      simpl in Eqt. rewrite Eq in Eqt.
-      rewrite <- Eqt. simpl.
-Abort.
+  split; intros;
+  rewrite <- H; clear;
+  destruct i, t; reflexivity.
+Qed.
 
 Theorem snf__mcstep: forall t v T,
   has_type empty t T ->
   step_normal_form_of t v ->
-  exists i,  mcstep i t = Some v.
+  exists i, mcstep i t = Some v.
 Proof.
-  intros t v T HT [Hms Hnf].
-  generalize dependent T.
-  generalize dependent v.
-  induction t; intros.
-  (* var *)
-  - solve_by_inverts 2.
-  (* app *)
-  - pose proof (app_fun_normalizes_first _ _ _ _ HT (conj Hms Hnf)) as
-    [x [T1 [u Ht1]]]. 
-    inversion HT; subst.
-    clear IHt2 H4.
-    assert (normal_form step (abs x T1 u)).
-    { intros [x0 contra]; inversion contra. }
-    pose proof (IHt1 _ Ht1 H _ H2) as [i H0].
-    clear H H2 Ht1 T2. admit.
-  (* abs *)
-  - inversion Hms; subst.
-  exists 0; auto.
-  solve_by_inverts 1.
-  (* fixp *)
-  - admit.
-  (* const *)
-  - inversion Hms; subst.
-    exists 0; auto.
-    solve_by_inverts 1.
-  (* succ *)
-  - pose proof (succ_arg_normalizes_first _ _ _ HT (conj Hms Hnf))
-    as [n H].
-    assert (normal_form step (const n)) by (intros []; solve_by_inverts 1).
-    inversion HT; subst.
-    pose proof (IHt (const n) H H0 Nat H3) as [i H1].
-    exists (S i). clear IHt.
-    destruct t eqn:Eq;
-    try solve_by_inverts 2.
-    + unfold mcstep. 
-
-
-
-  induction t; intros.
-  (* var *)
-  - inversion H;
-    inversion H0; subst.
-    exists 1; auto.
-    inversion H2.
-  (* app *)
-  - 
-
-Abort.
+  intros t v T HT Hsnf.
+  pose proof (wt_nf__value t T v HT) as [H _]. 
+  apply H in Hsnf as [Hms Hv]; clear H.
+  induction Hms.
+  - destruct x;
+    try solve_by_inverts 1;
+    exists 0; reflexivity.
+  - pose proof (preservation x y T HT H).
+    pose proof (IHHms H0 Hv) as [i Hyz].
+    apply step__cstep in H as Hxy.
+    exists (S i). simpl.
+    rewrite Hxy.
+    destruct x;
+    try solve_by_inverts 1;
+    assumption.
+Qed.

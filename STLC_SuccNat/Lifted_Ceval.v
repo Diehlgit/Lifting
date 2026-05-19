@@ -14,6 +14,18 @@ Fixpoint cstep' (t':tm') : tm' :=
   | fixp' t' => fixp' (cstep' t')
   end.
 
+Fixpoint mcstep' (i:nat) (t':tm') : option tm' :=
+  match t' with
+  | var' x => Some (var' x)
+  | abs' x T' t' => Some (abs' x T' t')
+  | const' n' => Some (const' n')
+  | t' => match i with
+          | O => None
+          | S i' => mcstep' i' (cstep' t')
+    end
+  end.
+
+
 Lemma step'__cstep': forall t1' t2',
   step' t1' t2' -> cstep' t1' = t2'.
 Proof.
@@ -78,44 +90,6 @@ Proof.
     subst. left. apply ST_SuccConst'.
 Qed.
 
-Lemma preservation'_cstep': forall t1' t2' T',
-  has_type' empty t1' T' ->
-  cstep' t1' = t2' ->
-  has_type' empty t2' T'.
-Proof.
-  intros.
-  apply cstep'__step' in H0.
-  destruct H0.
-  - eapply preservation'; eassumption.
-  - subst; assumption.
-Qed.
-
-Lemma progress'_cstep': forall t1' T',
-  has_type' empty t1' T' ->
-  value' t1' \/ exists t2', cstep' t1' = t2'.
-Proof.
-  intros.
-  apply progress' in H.
-  destruct H.
-  - left. assumption.
-  - destruct H as [t2' H].
-    right. exists t2'.
-    apply step'__cstep'. assumption.
-Qed.
-
-Compute (cstep' (succ' (var' "x"))).
-
-Fixpoint mcstep' (i:nat) (t':tm') : option tm' :=
-  match t' with
-  | var' x => Some (var' x)
-  | abs' x T' t' => Some (abs' x T' t')
-  | const' n' => Some (const' n')
-  | t' => match i with
-          | O => None
-          | S i' => mcstep' i' (cstep' t')
-    end
-  end.
-
 Lemma mcstep'_nf: forall i t' v',
   mcstep' i t' = Some v' -> normal_form step' v'.
 Proof.
@@ -153,7 +127,6 @@ Proof.
 Qed.
 
 Corollary mcstep'__snf': forall i t' v',
-  mcstep' i t' = Some v' ->
   mcstep' i t' = Some v' -> step'_normal_form_of t' v'.
 Proof.
   intros; split.
@@ -183,86 +156,24 @@ Proof.
   destruct i, t'; reflexivity.
 Qed.
 
-Lemma mcstep'_reduce: forall i t' v',
-  mcstep' i t' = Some v' ->
-  mcstep' (S i) t' = Some v'.
-Proof.
-  induction i; intros; 
-  destruct t'; auto;
-  try solve_by_inverts 1;
-  try (edestruct mcstep'_Si as [H1 _];
-      apply H1 in H; clear H1;
-      apply IHi in H;
-      edestruct mcstep'_Si as [_ H1];
-      apply H1 in H; clear H1;
-      assumption).
-Qed.
-
-Lemma canonical_forms_nat_mcstep: forall i t' v',
-  has_type' empty t' Nat' ->
-  mcstep' i t' = Some v' ->
-  exists n', v' = const' n'.
-Proof.
-  induction i; intros.
-  - simpl in H0. destruct t';
-    try solve_by_inverts 2.
-    injection H0 as H0. subst.
-    eexists; reflexivity.
-  - apply mcstep'_Si in H0.
-    eapply IHi.
-    2:{ eassumption. }
-Abort.
-
-Lemma mcstep'_succ': forall i t' v1',
-  mcstep' i (succ' t') = Some v1' ->
-  exists k v2', mcstep' k t' = Some v2'.
-Proof.
-  induction i; intros.
-  discriminate.
-  destruct t' eqn:Eqt';
-  try (simpl in H; apply IHi in H; assumption);
-  try (simpl in H; apply IHi in H as
-    [k [v2' H]];
-    exists (S k), v2';
-    simpl; assumption).
-  exists 0, (const' n). reflexivity.
-Qed.
-
-(* Lemma mcstep'_succ': forall i t' n',
-  mcstep' i t' = Some (const' n') ->
-  exists v1', mcstep' (S i) (succ' t') = Some v1'.
-Proof.
-  induction i; intros.
-  - destruct t'; try solve_by_inverts 1.
-    simpl in H. injection H as H; subst.
-    eexists. simpl. reflexivity.
-  - apply mcstep'_Si in H.
-    apply IHi in H as [v1' H]; clear - H.
-    eexists. apply mcstep'_Si.
-Abort. *)
-
-Lemma snf'__mcstep': forall t' v' T',
+Theorem snf'__mcstep': forall t' v' T',
   has_type' empty t' T' ->
   step'_normal_form_of t' v' ->
-    exists i, mcstep' i t' = Some v'.
+  exists i, mcstep' i t' = Some v'.
 Proof.
-  induction t';
-  intros v' T' HT' [Hms' Hnf'].
-  - inversion Hms'; subst.
-    + exists 0; auto.
-    + inversion H.
-  - inversion Hms'; subst.
-    + exists 0; auto.
-    + inversion H.
-  - admit.
-  - admit.
-  - inversion Hms'; subst.
-    + exists 0; auto.
-    + inversion H.
-  - inversion HT'; subst.
-    eapply IHt' in H1; clear IHt'.
-    + destruct H1 as [i H1].
-      exists (S i).
-      
-Abort.
-
+  intros t' v' T' HT' Hsnf'.
+  pose proof (wt_nf__value' t' T' v' HT') as [H _]. 
+  apply H in Hsnf' as [Hms' Hv']; clear H.
+  induction Hms'.
+  - destruct x;
+    try solve_by_inverts 1;
+    exists 0; reflexivity.
+  - pose proof (preservation' x y T' HT' H).
+    pose proof (IHHms' H0 Hv') as [i Hyz].
+    apply step'__cstep' in H as Hxy.
+    exists (S i). simpl.
+    rewrite Hxy.
+    destruct x;
+    try solve_by_inverts 1;
+    assumption.
+Qed.
