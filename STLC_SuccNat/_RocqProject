@@ -6,7 +6,11 @@ Lifted_STLC_SuccNat.v
 Environments.v
 Ceval.v
 Lifted_Ceval.v
+LR.v
 Examples.v
 Msubst.v
 Lifted_Msubst.v
-LR.v
+Derivation.v
+Notations.v
+Presence_Conditions_Notations.v
+Lifted_Notations.v

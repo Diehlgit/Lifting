@@ -12,8 +12,18 @@ Fixpoint cstep (t:tm) : tm :=
   | succ t => succ (cstep t)
   | fixp (abs x T t1) => app (abs x T t1) (fixp (abs x T t1))
   | fixp t => fixp (cstep t)
+  | add (const n1) (const n2) => (const (n1 + n2))
+  | add (const n1) t2 => add (const n1) (cstep t2)
+  | add t1 t2 => add (cstep t1) t2
+  | nil => nil
+  | cons (const n) t2 => cons (const n) (cstep t2)
+  | cons t1 t2 => cons (cstep t1) t2
+  | case nil tnil _ _ _ => tnil
+  | case (cons t1 t2) _ x y tcons => subst x t1 (subst y t2 tcons)
+  | case t1 tnil x y tcons => case (cstep t1) tnil x y tcons
   end.
 
+(* Compute cstep (case (cons (const 1) nil) (var "i") "x" "y" (const 2)). *)
 (* Compute cstep (succ (succ (const 1))). *)
 
 Fixpoint mcstep (i:nat) (t:tm) : option tm :=
@@ -53,7 +63,18 @@ Proof.
     destruct t1_1;
       try solve_by_inverts 1;
       try (rewrite H4; reflexivity).
-Qed.
+  (* ST_Add1 *)
+  - apply IHt1_1 in H3 as H4.
+    simpl.
+    destruct t1_1;
+      try solve_by_inverts 1;
+      try (rewrite H4; reflexivity).
+  (* ST_Add2 *)
+  - apply IHt1_2 in H4 as H5.
+    simpl.
+    destruct t1_1;
+      try solve_by_inverts 1.
+  + Abort.
 
 Lemma cstep__step: forall t1 t2,
   cstep t1 = t2 -> (step t1 t2) \/ t1 = t2.
@@ -98,7 +119,17 @@ Proof.
           rewrite <- H0; reflexivity)]);
     auto.
     subst. left. apply ST_SuccConst.
-Qed.
+  (* add *)
+  - remember (cstep t1_1) as t2_1.
+    simpl in H. destruct t1_1;
+      try (apply IHt1_1 in Heqt2_1 as [];
+        try solve_by_inverts 2; [
+          (left; rewrite <- H;
+           apply ST_Add1; assumption)|
+          (right; rewrite <- H;
+          rewrite <- H0; reflexivity)]);
+    auto.
+    subst. Abort.
   
 Lemma mcstep_nf: forall i t v,
   mcstep i t = Some v -> normal_form step v.
@@ -111,7 +142,7 @@ Proof.
     try (destruct (cstep t) eqn:Eq;
          (subst; simpl in *; rewrite Eq in H;
           eapply IHi; eassumption)).
-Qed.
+Abort.
 
 Lemma msctep__mstep: forall i t v,
   mcstep i t = Some v -> multi step t v.
@@ -134,17 +165,17 @@ Proof.
     apply IHi; assumption |
     injection H0 as H0; subst;
     apply IHi; assumption ]).
-Qed.
+Abort.
 
-Corollary mcstep__snf: forall i t v,
+(* Corollary mcstep__snf: forall i t v,
   mcstep i t = Some v -> step_normal_form_of t v.
 Proof.
   intros; split.
   - eapply msctep__mstep. eassumption.
   - eapply mcstep_nf. eassumption.
-Qed.
+Qed. *)
 
-Corollary wt_mcstep_value: forall i t v T,
+(* Corollary wt_mcstep_value: forall i t v T,
   has_type empty t T ->
   mcstep i t = Some v ->
   value v.
@@ -155,7 +186,7 @@ Proof.
   eassumption.
   eapply mcstep__snf.
   eassumption.
-Qed.
+Qed. *)
 
 Lemma mcstep_Si: forall i t v,
   mcstep (S i) t = Some v <->
@@ -166,7 +197,7 @@ Proof.
   destruct i, t; reflexivity.
 Qed.
 
-Theorem snf__mcstep: forall t v T,
+(* Theorem snf__mcstep: forall t v T,
   has_type empty t T ->
   step_normal_form_of t v ->
   exists i, mcstep i t = Some v.
@@ -186,4 +217,4 @@ Proof.
     destruct x;
     try solve_by_inverts 1;
     assumption.
-Qed.
+Qed. *)

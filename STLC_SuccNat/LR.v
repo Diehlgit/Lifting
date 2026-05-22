@@ -16,7 +16,21 @@ Inductive LR (conf:feat_config) : tm -> tm' -> Prop :=
     LR conf (const n) (const' n')
   | LR_succ: forall t t',
     LR conf t t' ->
-    LR conf (succ t) (succ' t').
+    LR conf (succ t) (succ' t')
+  | LR_add: forall t1 t2 t1' t2',
+    LR conf t1 t1' ->
+    LR conf t2 t2' ->
+    LR conf (add t1 t2) (add' t1' t2')
+  | LR_nil: LR conf nil nil'
+  | LR_cons: forall t h t' h',
+    LR conf t t' ->
+    LR conf h h' ->
+    LR conf (cons t h) (cons' t' h')
+  | LR_case: forall x y t tnil tcons t' tnil' tcons',
+    LR conf t t' ->
+    LR conf tnil tnil' ->
+    LR conf tcons tcons' ->
+    LR conf (case t tnil x y tcons) (case' t' tnil' x y tcons').
 
 Lemma subst_LR_subst': forall conf t1 t1' t2 t2' s,
   LR conf t1 t1' ->
@@ -38,6 +52,15 @@ Proof.
   - simpl. constructor. assumption.
   - simpl. constructor.
     apply IHHLR. assumption.
+  - simpl. apply LR_add.
+    + apply IHHLR1. assumption.
+    + apply IHHLR2. assumption.
+  - simpl. constructor.
+  - simpl. apply LR_cons.
+    + apply IHHLR1. assumption.
+    + apply IHHLR2. assumption.
+  - simpl. destruct (eqb_spec s x), (eqb_spec s y);
+      simpl; constructor; eauto.
 Qed.
 
 Lemma cstep_LR_cstep': forall conf t t',
@@ -66,6 +89,35 @@ Proof.
     simpl. constructor.
     apply mapping_not_change_deriving.
     assumption.
+- destruct t1, t1';
+    try solve_by_inverts 1;
+    try (apply IHt1 in H2;
+         constructor; assumption).
+  destruct t2, t2';
+    try solve_by_inverts 1;
+    try (apply IHt2 in H4;
+         constructor; assumption).
+  simpl in *. 
+  inversion H2; subst.
+  inversion H4; subst.
+  constructor.
+  apply binop_not_change_deriving; assumption.
+- constructor.
+- destruct t1, t'0;
+    try solve_by_inverts 1;
+    try (apply IHt1 in H2;
+         constructor; assumption).
+  destruct t2, h';
+    try solve_by_inverts 1;
+    try (apply IHt2 in H4;
+         constructor; assumption).
+- destruct t1, t'0;
+    try solve_by_inverts 1;
+    try (simpl; assumption);
+    try (apply IHt1 in H6;
+         constructor; assumption).
+    simpl. inversion H6; subst.
+    repeat apply subst_LR_subst'; assumption.
 Qed.
 
 Lemma mcstep_mcstep'__LR: forall conf i t t' v v',

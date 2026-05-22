@@ -99,13 +99,6 @@ Definition y' := [
 
 Definition z' := [ (19, pc_True) ].
 
-Ltac solve_by_inverts n :=
-	match goal with | H : ?T  |-  _  =>
-	match type of T with Prop =>
-		solve [ inversion H;
-		match n with S (S (?n')) =>
-			subst; solve_by_inverts (S n') end ]
-	end end.
 
 (* plusone(x'|p) = (plusone'(x'))|p *)
 Example comm_plusone_x': forall (cfg:feat_config) (x n:nat) (n':nat'),
@@ -333,7 +326,8 @@ Fixpoint gen_plusn' (n:nat) (t':tm') : tm' :=
 
 Definition plusn (n:nat) : tm := abs "n" Nat (gen_plusn n (var "n")).
 
-(* Compute subst "n" (const 0) (gen_plusn 1 (var "n")).
+
+(* Compute (subst "n" (const 0) (gen_plusn 1 (var "n"))).
 Compute plusn 0.
  *)
 
