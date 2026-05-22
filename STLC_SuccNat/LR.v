@@ -120,3 +120,86 @@ Proof.
   inversion H2; subst.
   assumption.
 Qed.
+
+(* Proving the Commutativity Theorem
+    with only 2 given hypothesis *)
+
+Lemma mcstep__LRL: forall conf i t t' v,
+  LR conf t t' ->
+  mcstep i t = Some v ->
+  exists v', mcstep' i t' = Some v' /\
+  LR conf v v'.
+Proof.
+ induction i; intros t t' v HLR Hmc.
+  - simpl in Hmc.
+    destruct t, t'; subst;
+    try solve_by_inverts 1;
+    try (eexists; split; 
+         [simpl; reflexivity|
+          injection Hmc as Hmc; subst;
+          assumption]).
+  - eapply cstep_LR_cstep' in HLR.
+    eapply IHi in HLR as [v' [H1 H2]].
+    + exists v'. split.
+      apply mcstep'_Si.
+      assumption. eassumption.
+    + pose proof (mcstep_Si i t v) as [H _].
+      apply H. assumption.
+Qed.
+
+Lemma mcstep__LRR: forall conf i t t' v',
+  LR conf t t' ->
+  mcstep' i t' = Some v' ->
+  exists v, mcstep i t = Some v /\
+  LR conf v v'.
+Proof.
+ induction i; intros t t' v' HLR Hmc.
+  - simpl in Hmc.
+    destruct t, t'; subst;
+    try solve_by_inverts 1;
+    try (eexists; split; 
+         [simpl; reflexivity|
+          injection Hmc as Hmc; subst;
+          assumption]).
+  - eapply cstep_LR_cstep' in HLR.
+    eapply IHi in HLR as [v [H1 H2]].
+    + exists v. split.
+      apply mcstep_Si.
+      assumption. eassumption.
+    + pose proof (mcstep'_Si i t' v') as [H _].
+      apply H. assumption.
+Qed.
+
+Theorem commutativityL: forall conf i analysis spl p r,
+  derive spl conf = Some p ->
+  mcstep i (app analysis (const p)) = Some (const r) ->
+  exists r', mcstep' i (app' (lift analysis) (const' spl)) = Some (const' r') /\
+  derive r' conf = Some r.
+Proof.
+  intros conf i analysis spl p r Hd Hmc.
+  pose proof (derive_LR conf spl p Hd).
+  pose proof (lift_LR conf analysis).
+  pose proof (LR_app _ _ _ _ _ H0 H).
+  pose proof (mcstep__LRL _ _ _ _ _ H1 Hmc) as [v' [H2 H3]].
+  inversion H3; subst.
+  eexists; split.
+  + rewrite H2. reflexivity.
+  + assumption.
+Qed.
+
+Theorem commutativityR: forall conf i analysis spl p r',
+  derive spl conf = Some p ->
+   mcstep' i (app' (lift analysis) (const' spl)) = Some (const' r') ->
+  exists r, mcstep i (app analysis (const p)) = Some (const r)  /\
+  derive r' conf = Some r.
+Proof.
+  intros conf i analysis spl p r' Hd Hmc'.
+  pose proof (derive_LR conf spl p Hd).
+  pose proof (lift_LR conf analysis).
+  pose proof (LR_app _ _ _ _ _ H0 H).
+  pose proof (mcstep__LRR _ _ _ _ _ H1 Hmc') as [v [H2 H3]].
+  inversion H3; subst.
+  eexists; split.
+  + rewrite H2. reflexivity.
+  + assumption.
+Qed.
