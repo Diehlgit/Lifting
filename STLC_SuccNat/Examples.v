@@ -44,29 +44,17 @@ Proof.
 Qed.
 
 Example plusone_0_is_1:
-  step_normal_form_of (STLC_SuccNat.app plusone (const 0)) (const 1).
+  exists i, mstep i (app plusone (const 0)) = Some (const 1).
 Proof.
-  split.
-  - eapply multi_step.
-    + apply ST_AppAbs.
-    + eapply multi_step.
-      * simpl. eapply ST_SuccConst.
-      * apply multi_refl.
-  - intros [t' Contra]. inversion Contra.
+  exists 2.
+  simpl. reflexivity.
 Qed.
 
 Example plustwo_3_is_5:
-  step_normal_form_of (STLC_SuccNat.app plustwo (const 3)) (const 5).
+ exists i, mstep i (app plustwo (const 3)) = Some (const 5).
 Proof.
-  split.
-  - eapply multi_step.
-    + apply ST_AppAbs.
-    + eapply multi_step.
-      * simpl. eapply ST_Succ. apply ST_SuccConst.
-      * eapply multi_step.
-        ** apply ST_SuccConst.
-        ** apply multi_refl.
-  - intros [t' Contra]. inversion Contra.
+  exists 3.
+  simpl. reflexivity.
 Qed.
 
 Require Import Lifted_STLC_SuccNat.
@@ -101,213 +89,136 @@ Definition z' := [ (19, pc_True) ].
 
 
 (* plusone(x'|p) = (plusone'(x'))|p *)
-Example comm_plusone_x': forall (cfg:feat_config) (x n:nat) (n':nat'),
-  (derive x' cfg ) = Some x ->
-  step_normal_form_of (STLC_SuccNat.app plusone (const x)) (const n) ->
-  step'_normal_form_of (app' (lift plusone) (const' x')) (const' n') ->
-  (derive n' cfg) = Some n.
+Example comm_plusone_x': forall (i:nat) (conf:feat_config) (x n:nat) (n':nat'),
+  (derive x' conf ) = Some x ->
+  mstep i (app plusone (const x)) = Some (const n) ->
+  mstep' i (app' (lift plusone) (const' x')) = Some (const' n') ->
+  (derive n' conf) = Some n.
 Proof.
-  unfold step_normal_form_of, step'_normal_form_of.
-  intros cfg x n n' Hd [Hmstep Hnf] [Hmstep' Hnf'].
-
-  (*Trying to simplify Hmstep*)
-  inversion Hmstep; subst.
-  inversion H; subst;
-    try (solve_by_inverts 1).
-  simpl in H0. inversion H0; subst.
-  inversion H1; subst;
-    try (solve_by_inverts 1).
-  inversion H2; subst;
-    try (solve_by_inverts 1).
-  clear Hmstep H0 H H2 H1.
-
-  (*Trying to simplify Hmstep'*)
-  inversion Hmstep'; subst.
-  inversion H; subst;
-    try (solve_by_inverts 1);
-    clear Hmstep' H.
-  inversion H0; subst.
-  inversion H; subst;
-    try (solve_by_inverts 1);
-    clear H0 H.
-  inversion H1; subst;
-    try (solve_by_inverts 1).
-
-  (* Case analysis on the feature configuration *)
-  simpl; simpl in Hd.
-  destruct in_dec.
-  - injection Hd as Hd;
-    subst; reflexivity.
-  - destruct in_dec;
-    injection Hd as Hd;
-    subst; reflexivity.
+  intros i conf x n n' Hd Hmstep Hmstep'.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i.
+  discriminate.
+  simpl in Hmstep.
+  rewrite mstep'_Si in Hmstep'.
+  unfold step' in Hmstep'.
+  remember (map (fun '(n, pc0) => (S n, pc0)) x') as x1'.
+  destruct i;
+    simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    apply mapping_not_change_deriving;
+    assumption.
 Qed.
 
 (* plusone(y'|p) = (plusone'(y'))|p *)
-Example comm_plusone_y: forall (cfg:feat_config) (y n: nat) (n':nat'),
-  (derive y' cfg) = Some y ->
-  step_normal_form_of (STLC_SuccNat.app plusone (const y)) (const n) ->
-  step'_normal_form_of (app' (lift plusone) (const' y')) (const' n') ->
-  (derive n' cfg) = Some n.
+Example comm_plusone_y: forall (i:nat) (conf:feat_config) (y n: nat) (n':nat'),
+  (derive y' conf) = Some y ->
+  mstep i (app plusone (const y)) = Some (const n) ->
+  mstep' i (app' (lift plusone) (const' y')) = Some (const' n') ->
+  (derive n' conf) = Some n.
 Proof.
-  unfold step_normal_form_of, step'_normal_form_of.
-  intros cfg y n n' Hd [Hmstep _] [Hmstep' _].
-
-  (*Simplifying Hmstep to find value of n*)
-  inversion Hmstep; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H Hmstep.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-  clear H1.
-
-  (*Simplifying Hmstep' to find value of n'*)
-  inversion Hmstep'; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H Hmstep'.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 2;
-    clear H H0.
-  simpl in H1.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-
-  (* Case analysis on the feature configuration *)
-  simpl; simpl in Hd.
-  destruct in_dec; (*destruct in_dec as many times as there are features*)
-  destruct in_dec;
-    injection Hd as Hd;
-    subst; reflexivity.
+  intros i conf y n n' Hd Hmstep Hmstep'.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i.
+  discriminate.
+  simpl in Hmstep.
+  rewrite mstep'_Si in Hmstep'.
+  unfold step' in Hmstep'.
+  remember (map (fun '(n, pc0) => (S n, pc0)) y') as y1'.
+  destruct i;
+    simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    apply mapping_not_change_deriving;
+    assumption.
 Qed.
 
 (* plusone(z'|p) = (plusone'(z'))|p *)
-Example comm_plusone_z: forall (cfg:feat_config) (z n: nat) (n':nat'),
-  (derive z' cfg) = Some z ->
-  step_normal_form_of (STLC_SuccNat.app plusone (const z)) (const n) ->
-  step'_normal_form_of (app' (lift plusone) (const' z')) (const' n') ->
-  (derive n' cfg) = Some n.
+Example comm_plusone_z: forall (i:nat) (conf:feat_config) (z n: nat) (n':nat'),
+  (derive z' conf) = Some z ->
+  mstep i (app plusone (const z)) = Some (const n) ->
+  mstep' i (app' (lift plusone) (const' z')) = Some (const' n') ->
+  (derive n' conf) = Some n.
 Proof.
-  unfold step_normal_form_of, step'_normal_form_of.
-  intros cfg z n n' Hd [Hmstep _] [Hmstep' _].
-  simpl in Hd; injection Hd as Hz.
-
-  (*Simplifying Hmstep to find value of n*)
-  inversion Hmstep; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H Hmstep.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-  clear H1.
-
-  (*Simplifying Hmstep' to find value of n'*)
-  inversion Hmstep'; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H Hmstep'.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 2;
-    clear H H0.
-  simpl in H1.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-
-  simpl. reflexivity.
+  intros i conf z n n' Hd Hmstep Hmstep'.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i.
+  discriminate.
+  simpl in Hmstep.
+  rewrite mstep'_Si in Hmstep'.
+  unfold step' in Hmstep'.
+  remember (map (fun '(n, pc0) => (S n, pc0)) z') as z1'.
+  destruct i;
+    simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    apply mapping_not_change_deriving;
+    assumption.
 Qed.
 
-Example lift_plusone_correct: forall spl cfg p r r',
-  derive spl cfg = Some p ->
-  step'_normal_form_of (app' (lift plusone) (const' spl)) (const' r') ->
-  step_normal_form_of (app plusone (const p)) (const r) ->
-  derive r' cfg = Some r.
+Example lift_plusone_correct: forall i spl conf p r r',
+  derive spl conf = Some p ->
+  mstep' i (app' (lift plusone) (const' spl)) = Some (const' r') ->
+  mstep i (app plusone (const p)) = Some (const r) ->
+  derive r' conf = Some r.
 Proof.
-  intros spl cfg p r r' Hd [Hmstep' _] [Hmstep _].
-
-  inversion Hmstep; subst.
-  inversion H; subst;
-    try solve_by_inverts 1.
-  simpl in H.
-  inversion H0; subst.
-  inversion H1; subst;
-    try solve_by_inverts 1.
-    clear H1 H0.
-  inversion H2; subst;
-    try solve_by_inverts 1;
-    clear H H2.
-
-  inversion Hmstep'; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H.
-    simpl in H0.
-  inversion H0; subst.
-  inversion H; subst;
-    try solve_by_inverts 1;
-    clear H H0.
-  inversion H1; subst;
-    try solve_by_inverts 1;
-    clear H1.
-
-  apply mapping_not_change_deriving.
-  assumption.
+  intros i spl conf p r r' Hd Hmstep' Hmstep.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  remember (map (fun '(n, pc0) => (S n, pc0)) spl) as spl'.
+  destruct i;
+    simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    apply mapping_not_change_deriving;
+    assumption.
 Qed.
 
-Ltac normalize :=
-	(eapply multi_step;
-		[ econstructor; econstructor 
-		| try (eapply multi_refl; econstructor); normalize]).
-
-Example lift_plustwo_correct: forall spl cfg p r r',
-  derive spl cfg = Some p ->
-  step'_normal_form_of (app' (lift plustwo) (const' spl)) (const' r') ->
-  step_normal_form_of (app plustwo (const p)) (const r) ->
-  derive r' cfg = Some r.
+Example lift_plustwo_correct: forall i spl conf p r r',
+  derive spl conf = Some p ->
+  mstep' i (app' (lift plustwo) (const' spl)) = Some (const' r') ->
+  mstep i (app plustwo (const p)) = Some (const r) ->
+  derive r' conf = Some r.
 Proof.
-  intros spl cfg p r r' Hd Hnf' Hnf.
-
-  assert (Hr: step_normal_form_of (app plustwo (const p)) (const (S(S p)))).
-  { split.
-    - eapply multi_step.
-      + econstructor; econstructor.
-      + eapply multi_step.
-        * econstructor. simpl. eapply ST_SuccConst.
-        * normalize.
-    - intros [t' contra]. inversion contra.
-  }
-
-  apply (normal_forms_unique _ _ _ Hnf) in Hr.
-  injection Hr as Hr.
-
-  assert (Hr': step'_normal_form_of (app' (lift plustwo) (const' spl))
-                    (const' (map (fun '(n, pc) => (S n, pc)) (map (fun '(n, pc) => (S n, pc)) spl)))).
-  { split.
-    - eapply multi_step.
-      + econstructor; econstructor.
-      + eapply multi_step.
-        * econstructor. eapply ST_SuccConst'.
-        * normalize.
-    - intros [t' contra]. inversion contra.
-  }
-
-  apply (normal_forms'_unique _ _ _ Hnf') in Hr'.
-  injection Hr' as Hr'.
-
-  subst.
-  apply mapping_not_change_deriving.
-  apply mapping_not_change_deriving.
-  assumption.
+  intros i spl conf p r r' Hd Hmstep' Hmstep.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  remember (map (fun '(n, pc0) => (S n, pc0)) spl) as spl'.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  remember (map (fun '(n, pc0) => (S n, pc0)) spl') as spl''.
+  destruct i;
+    simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    repeat apply mapping_not_change_deriving;
+    assumption.
 Qed.
 
 (* Trying to work with a general plus_n function *)
@@ -324,153 +235,45 @@ Fixpoint gen_plusn' (n:nat) (t':tm') : tm' :=
   | S m => succ' (gen_plusn' m t')
   end.
 
-Definition plusn (n:nat) : tm := abs "n" Nat (gen_plusn n (var "n")).
+Definition plusn (n:nat): tm := abs "n" Nat (add (const n) (var "n")).
 
-
-(* Compute (subst "n" (const 0) (gen_plusn 1 (var "n"))).
-Compute plusn 0.
- *)
-
-Lemma subst_gen_plusn: forall n s t,
-  subst s t (gen_plusn n (var s)) = gen_plusn n t.
-Proof.
-  induction n; intros; simpl.
-  - rewrite eqb_refl. reflexivity.
-  - rewrite IHn. reflexivity.
-Qed.
-
-Lemma subst'_gen_plusn: forall n s t',
-  subst' s t' (lift (gen_plusn n (var s))) = gen_plusn' n t'.
-Proof.
-  induction n; intros; simpl.
-  - rewrite eqb_refl. reflexivity.
-  - rewrite IHn. reflexivity.
-Qed.
-
-(* Auxiliary proofs stating that the application of plusn and plusn'
-   have closed forms.
-*)
-
-Lemma normal_form_plusn: forall n k,
-    step_normal_form_of (app (plusn n) (const k)) (const (n + k)).
-Proof.
-  intros. induction n;
-  split; try (intros [t contra]; inversion contra).
-  - normalize.
-  - unfold plusn in *.
-    inversion IHn. clear H0.
-    inversion H; subst.
-    inversion H0; subst;
-      try solve_by_inverts 1.
-    clear H0 H IHn.
-    rewrite subst_gen_plusn in H1.
-
-    eapply multi_step.
-    + apply ST_AppAbs.
-    + rewrite subst_gen_plusn. simpl.
-      assert (H: step_normal_form_of (gen_plusn n (const k)) (const (n + k))).
-      { split. exact H1. intros [t contra]; inversion contra. }
-      clear H1.
-      assert (H0: multi step (succ (const (n + k))) (const (S (n + k)))).
-      { normalize. }
-      apply succ_arg_normalizes in H.
-      apply (multi_step_trans _ _ _ H H0).
-Qed.
-
-Lemma normal_form'_lift_plusn: forall n k,
-  step'_normal_form_of (app' (lift (plusn n)) (const' k))
-    (const' (map (fun '(n0, pc) => (n + n0, pc)) k)).
-Proof.
-  intros. induction n;
-  split; try (intros [t contra]; inversion contra).
-  - eapply multi_step; simpl.
-    + apply ST_AppAbs'.
-    + simpl. assert(Hk: (map (fun '(n0, pc0) => (n0, pc0)) k) = k).
-      { induction k. reflexivity.
-        simpl. f_equal.
-        - destruct a. reflexivity.
-        - exact IHk. }
-      rewrite Hk. apply multi_refl.
-  - unfold plusn in *.
-    inversion IHn. clear H0.
-    inversion H; subst.
-    inversion H0; subst;
-      try solve_by_inverts 1.
-    clear H0 H IHn.
-    rewrite subst'_gen_plusn in H1.
-
-    eapply multi_step.
-    + apply ST_AppAbs'.
-    + rewrite subst'_gen_plusn. simpl.
-      assert (H: step'_normal_form_of (gen_plusn' n (const' k))
-        (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k))).
-      { split. exact H1. intros [t contra]; inversion contra. }
-      clear H1.
-      assert (H0: multi step' (succ' (const' (map (fun '(n0, pc0) => ((n + n0), pc0)) k)))
-        (const' (map (fun '(n0, pc0) => (S (n + n0), pc0)) k))).
-      { eapply multi_step.
-        - apply ST_SuccConst'.
-        - rewrite map_map_fst. apply multi_refl. }
-      apply succ'_arg_normalizes in H.
-      apply (multi_step'_trans _ _ _ H H0).
-Qed.
-
-(* Proving that the commutation diagram holds for
+(* Proving that the commutativity diagram holds for
    any (+ n) function.
  *)
 
-Theorem lift_plusn_correct: forall n spl cfg p r r',
-  derive spl cfg = Some p ->
-  step'_normal_form_of (app' (lift (plusn n)) (const' spl)) (const' r') ->
-  step_normal_form_of (app (plusn n) (const p)) (const r) ->
-  derive r' cfg = Some r.
+Theorem lift_plusn_correct: forall i n spl conf p r r',
+  derive spl conf = Some p ->
+  mstep' i (app' (lift (plusn n)) (const' spl)) = Some (const' r') ->
+  mstep i (app (plusn n) (const p)) = Some (const r) ->
+  derive r' conf = Some r.
 Proof.
-  intros n spl cfg p r r' Hd Hsnf' Hsnf.
-  (* Showing that r = const (n + p) *)
-  assert (Hr: const r = const (n + p)).
-  { apply normal_forms_unique with (t1:= (app (plusn n) (const p))).
-    - exact Hsnf.
-    - apply normal_form_plusn. }
-  injection Hr as Hr; subst.
-  (* assert (Hf: n + p = (fun k => n + k) p). reflexivity. *)
-
-  (* Showing that r' = const' (map (fun '(n0, pc) => (n + n0, pc)) spl) *)
-  assert (Hr': const' r' = const' (map (fun '(n0, pc) => (n + n0, pc)) spl)).
-  { apply normal_forms'_unique with (t1':= (app' (lift (plusn n)) (const' spl))).
-    - exact Hsnf'.
-    - apply normal_form'_lift_plusn. }
-  injection Hr' as Hr'; subst.
-
-  apply mapping_not_change_deriving.
-  exact Hd.
+  intros i n spl conf p r r' Hd Hmstep' Hmstep.
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  destruct i; [
+    discriminate |
+    simpl in Hmstep, Hmstep'].
+  assert ((map (fun '(v2, pc2) => (n + v2, pc_And pc_True pc2)) spl ++ []) =
+          (app_binop Nat.add [(n, pc_True)] spl))
+          by reflexivity.
+  rewrite H in Hmstep'.
+  remember (app_binop Nat.add [(n, pc_True)] spl) as spl'.
+  destruct i;
+    (simpl in Hmstep;
+    simpl in Hmstep';
+    injection Hmstep as Hmstep;
+    injection Hmstep' as Hmstep';
+    subst;
+    apply binop_not_change_deriving;
+    [ auto | assumption ]).
 Qed.
 
-(* LR Counter Example *)
+(* Analysis function examples *)
+From STLC Require Import  Lifted_Notations Notations.
 
-Print plusone.
-Example wt_plusone:
-  has_type empty plusone (Arrow Nat Nat).
-Proof. repeat constructor. Qed.
+Definition plus := <{\"x" : Nat, \"y" : Nat, '"x" + '"y"}>.
+Definition plus' := lift plus.
+Compute (lift plus).
 
-Check wt_plusone.
 
-Definition fixp_plusone := fixp plusone.
-
-Example wt_fixp_plusone:
-  has_type empty fixp_plusone Nat.
-Proof. constructor. apply wt_plusone. Qed.
-
-(* Above we hava a well typed term.
-   Even though it has a subterm which should
-   belong to LR, since this term does not terminate
-   it should not belong to LR. *)
-
-Example fixp_plusone_fails:
-  exists v, step_normal_form_of fixp_plusone v.
-Proof.
-  eexists. split.
-  - unfold fixp_plusone, plusone.
-    eapply multi_step; [apply ST_FixpAbs|].
-    eapply multi_step; [apply ST_AppAbs|].
-    simpl. (* And so on, forever ... *)
-Abort.

@@ -66,14 +66,14 @@ Check <{ \"f" : Nat , \"x" : Nat , '"f" '"x" }>.
 Check <{ (\"f" : Nat , '"f") 42 }>.
 (* app (abs "f" Nat (var "f")) (const 42) : tm *)
 
-Notation "'succ' t" := (succ t)
+Notation "'s' t" := (succ t)
   (in custom tm at level 89,
    t custom tm at level 89).
 
-Check <{ succ 42 }>.                    (* succ (const 42) : tm *)
-Check <{ succ '"f" }>.                  (* succ (var "f") : tm *)
-Check <{ succ succ 42 }>.             (* succ (succ (const 42)) : tm *)
-Check <{ (\"f" : Nat , succ '"f") 42 }>. (* app (abs "f" Nat (succ (var "f"))) (const 42) : tm *)
+Check <{ s 42 }>.                    (* succ (const 42) : tm *)
+Check <{ s '"f" }>.                  (* succ (var "f") : tm *)
+Check <{ s s 42 }>.             (* succ (succ (const 42)) : tm *)
+Check <{ (\"f" : Nat , s '"f") 42 }>. (* app (abs "f" Nat (succ (var "f"))) (const 42) : tm *)
 
 Notation "t1 + t2" := (add t1 t2)
   (in custom tm at level 50, left associativity,
@@ -83,8 +83,8 @@ Check <{ 42 + 1 }>.                     (* add (const 42) (const 1) : tm *)
 Check <{ '"f" + '"x" }>.                (* add (var "f") (var "x") : tm *)
 Check <{ 1 + 2 + 3 }>.                  (* add (add (const 1) (const 2)) (const 3) : tm *)
 Check <{ 1 + (2 + 3) }>.                (* add (const 1) (add (const 2) (const 3)) : tm *)
-Check <{ succ 1 + 2 }>.              (* add (succ (const 1)) (const 2) : tm *)
-Check <{ succ (1 + 2) }>.            (* succ (add (const 1) (const 2)) : tm *)
+Check <{ s 1 + 2 }>.              (* add (succ (const 1)) (const 2) : tm *)
+Check <{ s (1 + 2) }>.            (* succ (add (const 1) (const 2)) : tm *)
 
 Notation "'nil'" := nil (in custom tm at level 0).
 
@@ -96,7 +96,7 @@ Check <{ nil }>.                          (* nil : tm *)
 Check <{ 1 :: nil }>.                     (* cons (const 1) nil : tm *)
 Check <{ 1 :: 2 :: nil }>.               (* cons (const 1) (cons (const 2) nil) : tm *)
 Check <{ 1 :: 2 :: 3 :: nil }>.          (* cons (const 1) (cons (const 2) (cons (const 3) nil)) : tm *)
-Check <{ succ 1 :: nil }>.             (* cons (succ (const 1)) nil : tm *)
+Check <{ s 1 :: nil }>.             (* cons (succ (const 1)) nil : tm *)
 Check <{ (1 + 2) :: nil }>.              (* cons (add (const 1) (const 2)) nil : tm *)
 
 Notation "[ t ]" := (cons t nil)
@@ -120,7 +120,7 @@ Notation "'case' t1 'of' '|' 'nil' => t2 '|' h :: t => t3" := (case t1 t2 h t t3
    t3 custom tm at level 99,
    format "'[hv' 'case'  t1  'of' '//' '|'  'nil'  '=>'  t2 '//' '|'  h  '::'  t  '=>'  t3 ']'").
 
-Check <{ case nil of | nil => 0 | "h" :: "t" => succ '"h" }>.
+Check <{ case nil of | nil => 0 | "h" :: "t" => s '"h" }>.
 (* case nil (const 0) "h" "t" (succ (var "h")) : tm *)
 
 Check <{ case (1 :: 2 :: nil) of

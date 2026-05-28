@@ -1,4 +1,5 @@
 From Stdlib Require Import String List.
+
 Import List.ListNotations.
 Open Scope list_scope.
 From STLC Require Import STLC_SuccNat Presence_Conditions.
@@ -72,54 +73,55 @@ Fixpoint subst' (x:string) (s' t': tm'): tm' :=
                                         (if (orb (eqb x y) (eqb x z)) then t3' else (subst' x s' t3'))
   end.
 
-Inductive step': tm' -> tm' -> Prop :=
-  | ST_App': forall t1' t1'' t2',
-    step' t1' t1'' ->
-      step' (app' t1' t2') (app' t1'' t2')
-  | ST_AppAbs': forall x T' t' v',
-    step' (app' (abs' x T' t') v') (subst' x v' t')
-  | ST_FixpAbs': forall x T' t',
-    step' (fixp' (abs' x T' t')) (app' (abs' x T' t') (fixp' (abs' x T' t')))
-  | ST_Fixp' : forall t1' t2',
-    step' t1' t2' ->
-    step' (fixp' t1') (fixp' t2')
+Fixpoint step' (t':tm') : tm' :=
+  match t' with
+  | app' t1' t2' => match t1' with
+                    | abs' x T' b' => subst' x t2' b'
+                    | _ => app' (step' t1') t2'
+                    end
+  | succ' t' => match t' with
+                | const' n' => const' (List.map (fun '(n, pc) => (S n, pc)) n')
+                | _ => succ' (step' t')
+                end
+  | fixp' t' => match t' with
+                | abs' x T' b' => subst' x (fixp' t') b'
+                | _ => fixp' (step' t')
+                end
+  | add' t1' t2' => match t1' with
+                    | const' n1' => match t2' with
+                                    | const' n2' => const' (app_binop Nat.add n1' n2')
+                                    | _ => add' t1' (step' t2')
+                                    end
+                    | _ => add' (step' t1') t2'
+                    end
+  | cons' t1' t2' => match t1' with
+                     | const' n1' => cons' t1' (step' t2')
+                     | _ => cons' (step' t1') t2'
+                     end
+  | case' t1' tnil' x y tcons' => match t1' with
+                                  | nil' => tnil'
+                                  | cons' h' t' => subst' y t' (subst' x h' tcons')
+                                  | _ => case' (step' t1') tnil' x y tcons'
+                                  end
+  | _ => t'
+  end.
 
-  | ST_Succ': forall t' t'',
-    step' t' t'' ->
-      step' (succ' t') (succ' t'')
-  | ST_SuccConst': forall n',
-      step' (succ' (const' n'))
-      (const' (List.map (fun '(n,pc) => ((S n), pc)) n'))
-  
-  | ST_Add1' : forall t1' t1'' t2',
-      step' t1' t1'' ->
-        step' (add' t1' t2') (add' t1'' t2')
-  | ST_Add2' : forall v1' t2' t2'',
-      value' v1' ->
-      step' t2' t2'' ->
-        step' (add' v1' t2') (add' v1' t2'')
-  | ST_AddConst' : forall n1' n2',
-      step' (add' (const' n1') (const' n2')) (const' (app_binop Nat.add n1' n2'))
+Fixpoint is_terminal' (t' : tm') : bool :=
+  match t' with
+  | var' _      => true
+  | abs' _ _ _  => true
+  | const' _    => true
+  | nil'        => true
+  | cons' t1' t2' => is_terminal' t1' && is_terminal' t2'
+  | _           => false
+  end.
 
-  | ST_Cons1': forall t1' t2' t3',
-    step' t1' t2' ->
-    step' (cons' t1' t3') (cons' t2' t3')
-  | ST_Cons2': forall v1' t2' t3',
-    value' v1' ->
-    step' t2' t3' ->
-    step' (cons' v1' t2') (cons' v1' t3')
-  | ST_Case1': forall x y t1' t2' tnil' tcons',
-    step' t1' t2' ->
-    step' (case' t1' tnil' x y tcons') (case' t2' tnil' x y tcons')
-  | ST_CaseNil': forall x y tnil' tcons',
-    step' (case' nil' tnil' x y tcons') tnil'
-  | ST_CaseCons': forall x y vh' vt' tnil' tcons',
-    value' vh' ->
-    value' vt' ->
-    step' (case' (cons' vh' vt') tnil' x y tcons') (subst' y vt' (subst' x vh' tcons')).
-
-Definition step'_normal_form_of t1' t2':=
-  (multi step' t1' t2' /\ normal_form step' t2').
+Fixpoint mstep' (i:nat) (t':tm') : option tm' :=
+  if (is_terminal' t') then Some t'
+  else match i with
+       | O => None
+       | S i' => mstep' i' (step' t')
+       end.  
 
 (* Typing *)
 Definition context' := partial_map ty'.
@@ -220,58 +222,6 @@ Proof.
     split; [auto|split;auto]. *)
 Qed.
 
-Theorem progress' : forall t1' T',
-  has_type' empty t1' T' ->
-    value' t1' \/ exists t2', step' t1' t2'.
-Proof.
-  intros t' T' Ht.
-  remember empty as Gamma'.
-  induction Ht; subst Gamma'.
-    (*try (left; constructor).*)
-  - inversion H.
-  - left; constructor.
-  - right. destruct IHHt1;
-    destruct IHHt2; unfold_exists; eauto using ST_App', ST_AppAbs'.
-    + eapply canonical_forms_fun' in Ht1 as [x [u' Ht1'] ]; subst;
-      eauto; eexists; econstructor; assumption.
-    + eapply canonical_forms_fun' in Ht1 as [x0 [u' Ht1'] ]; subst;
-      eauto; eexists; econstructor; assumption.
-  - right. destruct IHHt; auto.
-    + eapply canonical_forms_fun' in Ht as [x [u Ht]]; subst;
-      eauto; eexists; econstructor; assumption.
-    + destruct H; eexists; eapply ST_Fixp'; eauto.
-  - left; constructor.
-  - right. destruct IHHt; eauto.
-    + eapply canonical_forms_nat' in H as [n' H]; subst; eauto.
-      eexists. apply ST_SuccConst'.
-    + destruct H; eexists; eapply ST_Succ'; eauto.
-  - right. destruct IHHt2, IHHt1; eauto.
-    + eapply canonical_forms_nat' in H as [n2' H2];
-      eapply canonical_forms_nat' in H0 as [n1' H1];
-      subst; eauto. eexists. apply ST_AddConst'.
-    + destruct H0; eexists;
-      eapply ST_Add1'; eassumption.
-    + destruct H; eexists;
-      eapply ST_Add2'; eassumption.
-    + destruct H0; eexists;
-      eapply ST_Add1'; eassumption.  - left; constructor.
-  - destruct IHHt1; auto.
-    + destruct IHHt2; auto.
-      * left. constructor; auto.
-      * right. unfold_exists.
-        eexists; eauto using ST_Cons2'.
-    + right. unfold_exists.
-      eexists; eauto using ST_Cons1'.
-  - destruct IHHt1; auto; right.
-    + destruct t1';
-        try solve_by_inverts 1; eexists.
-        * apply ST_CaseNil'.
-        * inversion H; subst.
-          eapply ST_CaseCons'; auto.
-    + unfold_exists. eexists.
-      constructor. eauto.
-Qed.
-
 Lemma substitution_preserves_typing': forall Gamma' x U' t' v' T',
   has_type' (x |-> U' ; Gamma') t' T' ->
   has_type' empty v' U' ->
@@ -306,54 +256,50 @@ Proof.
         rewrite H. assumption.
 Qed.
 
-Theorem preservation': forall t1' t2' T',
-  has_type' empty t1' T' ->
-  step' t1' t2' ->
-  has_type' empty t2' T'.
+Theorem preservation': forall t' T',
+  has_type' empty t' T' ->
+  has_type' empty (step' t') T'.
 Proof.
-  intros t1' t2' T' Ht;
-  generalize dependent t2'.
-  remember empty as Gamma'.
-  induction Ht; intros ts' H0;
-    inversion H0; subst;
-      try (econstructor; eauto).
-  inversion Ht1; subst.
-  apply (T_App' _ _ _ _ _ Ht1) in Ht2.
-  - eapply substitution_preserves_typing';
-    inversion Ht2; inversion H4; subst;
+  induction t'; intros T' HT';
+    inversion HT'; subst;
+    try (apply IHt'1 in H2; clear IHt'1;
+    destruct t'1;
+    try (econstructor; eassumption;
+    try solve_by_inverts 2)).
+  - inversion H1.
+  - assumption.
+  - simpl. inversion H2; subst.
+    eapply substitution_preserves_typing';
     eassumption.
-  - inversion Ht; subst.
-    constructor.
-    eassumption.
+  - apply IHt' in H1.
+    destruct t';
+    try (constructor; assumption).
+    inversion H1; subst.
+    eapply substitution_preserves_typing'.
+    eassumption. assumption.
   - assumption.
-  - inversion Ht1; subst.
-    repeat eapply substitution_preserves_typing'; eauto.
-Qed.
-
-Lemma preservation'_multi: forall t1' t2' T',
-  has_type' empty t1' T' ->
-  multi step' t1' t2' ->
-  has_type' empty t2' T'.
-Proof.
-  intros t1' t2' T' Htype' Hmulti.
-  induction Hmulti.
+  - apply IHt' in H1. simpl.
+    destruct t';
+    try solve_by_inverts 2;
+    try constructor; assumption.
+  - apply IHt'2 in H4; clear IHt'2.
+    destruct t'2;
+    try solve_by_inverts 2;
+    try (constructor; assumption).
   - assumption.
-  - apply (preservation' _ _ _ Htype') in H.
-    apply IHHmulti. apply H.
+  - apply IHt'2 in H4; clear IHt'2.
+    destruct t'2;
+    try solve_by_inverts 2;
+    try (constructor; assumption).
+  - apply IHt'1 in H6 as H.
+    destruct t'1;
+    try (constructor; assumption);
+    try solve_by_inverts 2.
+    + simpl. assumption.
+    + inversion H6; subst. simpl.
+      repeat eapply substitution_preserves_typing';
+      eassumption.
 Qed.
-
-Lemma wt_nf_is_value': forall t1' t2' T',
-  has_type' empty t1' T' ->
-  step'_normal_form_of t1' t2' ->
-  value' t2'.
-Proof.
-  intros t1' t2' T' HT [Hms' Hnf'].
-  apply (preservation'_multi _ _ _ HT) in Hms'.
-  apply progress' in Hms' as [].
-  - assumption.
-  - destruct Hnf'. assumption.
-Qed.
-
 
 (* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:feat_config) (p:nat) (analysis:nat->nat),
@@ -410,82 +356,11 @@ Proof.
 Qed.
 
 (* Language Theorems *)
-Lemma multi_step'_trans: forall t1' t2' t3',
-  multi step' t1' t2' ->
-  multi step' t2' t3' ->
-  multi step' t1' t3'.
-Proof.
-  intros t1' t2' t3' H12 H23.
-  induction H12.
-  - exact H23.
-  - apply IHmulti in H23.
-    eapply multi_step.
-    + exact H.
-    + exact H23.
-Qed.
-
-Lemma value'_is_nf: forall t',
-  value' t' -> step'_normal_form_of t' t'.
-Proof.
-  induction t'; intros Hv;
-  split;
-    try inversion Hv; subst;
-    try (intros [t1' Hc]; inversion Hc);
-    try constructor; subst.
-  - apply IHt'1 in H1 as [_ H1]; eauto.
-  - apply IHt'2 in H2 as [_ H2]; eauto.
-Qed.
-
-Ltac value'_no_step :=
-	match goal with
-	| [ H1: value' ?t, H2: step' ?t  _ |- _ ] =>
-		exfalso; apply value'_is_nf in H1 as [_ H1]; eauto
-	| [ H1: value' ?t1, H2: value' ?t2, H3: step' (cons' ?t1 ?t2) _ |- _] =>
-    inversion H3; subst; exfalso;
-             apply value'_is_nf in H1 as [_ H1];
-             apply value'_is_nf in H2 as [_ H2]; eauto
-  end.
 
 Theorem determinism' : forall t1' t2' t3',
-  step' t1' t2' -> step' t1' t3' -> t2' = t3'.
+  step' t1' = t2' -> step' t1' = t3' -> t2' = t3'.
 Proof.
-  intros t1' t2' t3' Ht.
-  generalize dependent t3'.
-  induction Ht; intros t4' Ht';
-    inversion Ht'; subst; eauto;
-    try value'_no_step;
-    try (f_equal; eauto);
-    try solve_by_inverts 1.
-Qed.
-
-Theorem normal_forms'_unique: forall t1' t2' t3',
-  step'_normal_form_of t1' t2' ->
-  step'_normal_form_of t1' t3' ->
-  t2' = t3'.
-Proof.
-  intros t1' t2' t3' P1 P2.
-  destruct P1 as [P12 Pnf2].
-  destruct P2 as [P13 Pnf3].
-  induction P12; subst;
-    inversion P13; subst;
-    try (apply (IHP12 Pnf2)).
-  - reflexivity.
-  - destruct Pnf2. eauto.
-  - destruct y; destruct Pnf3; eauto.
-  - remember (determinism' _ _ _ H H0) as e. congruence.
-Qed.
-
-Lemma succ'_arg_normalizes: forall t1' t2',
-  step'_normal_form_of t1' t2' ->
-  multi step' (succ' t1') (succ' t2').
-Proof.
-  intros t1' t2' [Hms' Hnf'].
-  induction Hms'; subst.
-  - apply multi_refl.
-  - apply IHHms' in Hnf'.
-    eapply multi_step.
-    + apply ST_Succ'. exact H.
-    + exact Hnf'.
+  intros. subst. reflexivity.
 Qed.
 
 Lemma has_type'_lookup_equiv : forall Gamma1 Gamma2 t T,
@@ -602,15 +477,15 @@ Proof.
   - (* Var *)
     destruct (eqb_spec x s);
     reflexivity.
-  - (* App *)
-    rewrite IHbody1.
-    rewrite IHbody2.
-    reflexivity.
   - (* Abs *)
     destruct (eqb_spec x s).
     + reflexivity.
     + simpl. rewrite IHbody.
       reflexivity.
+  - (* App *)
+    rewrite IHbody1.
+    rewrite IHbody2.
+    reflexivity.
   - (* Fixp *)
     rewrite IHbody. reflexivity.
   - (* Const *)
@@ -644,181 +519,91 @@ Proof.
 Qed.
 
 Lemma step_step': forall t1 t2,
-  step t1 t2 ->
-  step' (lift t1) (lift t2).
+  step t1 = t2 ->
+  step' (lift t1) = (lift t2).
 Proof.
-  induction t1; intros t2 Hstep;
-    try solve_by_inverts 2.
-  - inversion Hstep; subst.
-    + apply IHt1_1 in H2.
-      apply ST_App'.
-      assumption.
-    + rewrite lift_subst_subst'_lift.
-      apply ST_AppAbs'.
-  - inversion Hstep; subst.
-    + simpl. constructor.
-    + simpl. constructor.
-      auto.
-  - inversion Hstep; subst.
-    + apply IHt1 in H0.
-      apply ST_Succ'; assumption.
-    + apply ST_SuccConst'.
-  - inversion Hstep; subst.
-    + apply IHt1_1 in H2.
-      simpl. apply ST_Add1'.
-      assumption.
-    + apply IHt1_2 in H3.
-      simpl. apply ST_Add2';
-        try (apply value_value' in H1);
-        assumption.
-    + simpl. replace [(n1 + n2, pc_True)]
-      with (app_binop Nat.add [(n1, pc_True)] [(n2, pc_True)]).
-      apply ST_AddConst'. simpl. admit.
-      (*TODO: to prove this we could define presence condition
-        normalization to evaluate expressions of literals *)
-  - inversion Hstep; subst.
-    + apply IHt1_1 in H2.
-      apply ST_Cons1'. assumption.
-    + apply IHt1_2 in H3.
-      apply ST_Cons2';
-        try (apply value_value' in H1);
-        assumption.
-  - inversion Hstep; subst; simpl.
-    + apply IHt1_1 in H5.
-      apply ST_Case1'.
-      assumption.
-    + apply ST_CaseNil'.
-    + repeat rewrite lift_subst_subst'_lift.
-      apply ST_CaseCons';
-        auto using value_value'.
+  (*TODO: to prove this we could define presence condition
+    normalization to evaluate expressions of literals *)
 Abort.
 
-Lemma mstep_mstep': forall t1 t2,
-  multi step t1 t2 ->
-  multi step' (lift t1) (lift t2).
+Lemma is_terminal'_step': forall t',
+  is_terminal' t' = true -> step' t' = t'.
 Proof.
-  intros t1 t2 Hmulti.
-  induction Hmulti.
-  - apply multi_refl.
-  - eapply multi_step with (y:= (lift y)).
-(*    + apply step_step'. apply H.
-    + exact IHHmulti. *)
-Abort.
-
-Lemma multistep'_succ' : forall t' t1',
-  multi step' t' t1' -> multi step' (succ' t') (succ' t1').
-Proof.
-  intros t t' STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_Succ'; eauto.  auto.
+  intros t' Ht'.
+  induction t';
+  try reflexivity;
+  try discriminate.
+  simpl in Ht'.
+  rewrite Bool.andb_true_iff in Ht'.
+  destruct Ht'.
+  apply IHt'1 in H.
+  apply IHt'2 in H0.
+  simpl. rewrite H, H0.
+  destruct t'1;
+  reflexivity.
 Qed.
 
-Lemma multistep'_fixp' : forall t1' t2',
-  multi step' t1' t2' -> multi step' (fixp' t1') (fixp' t2').
+Lemma value'_is_terminal': forall v',
+  value' v' -> is_terminal' v' = true.
 Proof.
-  intros t1' t2' STM. induction STM.
-    apply multi_refl.
-    eapply multi_step.
-      apply ST_Fixp'; eauto. auto.
+  intros v' Hv'.
+  induction v';
+  inversion Hv';
+  try reflexivity.
+  subst.
+  apply IHv'1 in H1.
+  apply IHv'2 in H2.
+  simpl. rewrite H1, H2.
+  reflexivity.
 Qed.
 
-Lemma multistep'_app': forall t1' t2' t3',
-  multi step' t1' t2' -> multi step' (app' t1' t3') (app' t2' t3').
+Lemma mstep'_Si: forall i t' v',
+  mstep' (S i) t' = Some v' <->
+  mstep' i (step' t') = Some v'.
 Proof.
-  intros t1' t2' t3' STM. induction STM.
-    apply multi_refl.
-    eapply multi_step.
-      apply ST_App'; eauto. auto.
+  split; intros;
+    rewrite <- H;
+    destruct i, t';
+    try reflexivity;
+    try (
+      destruct (is_terminal' (cons' t'1 t'2)) eqn:Eq;
+        [ apply is_terminal'_step' in Eq as Heq;
+        simpl in Eq;
+        rewrite Heq;
+        simpl; rewrite Eq;
+        reflexivity |
+        simpl in Eq;
+        simpl; rewrite Eq;
+        reflexivity]).
 Qed.
 
-Lemma wt_nf__value': forall t' T' v',
+Lemma mstep'_value: forall i v',
+  value' v' -> mstep' i v' = Some v'.
+Proof.
+  intros i v' Hv'.
+  destruct Hv';
+  try (destruct i; reflexivity).
+  - apply value'_is_terminal' in Hv'1.
+    apply value'_is_terminal' in Hv'2.
+    destruct i;
+    simpl; rewrite Hv'1, Hv'2;
+    simpl; reflexivity.
+Qed.
+
+Lemma preservation_multi': forall i t' v' T',
   has_type' empty t' T' ->
-    step'_normal_form_of t' v' <->
-    multi step' t' v' /\ value' v'.
+  mstep' i t' = Some v' ->
+  has_type' empty v' T'.
 Proof.
-  intros t' T' v' HT. split.
-  - intros [Hms Hnf].
-    split; auto.
-    apply (preservation'_multi _ _ _ HT) in Hms.
-    apply progress' in Hms as [].
-    + assumption.
-    + exfalso. apply Hnf. assumption.
-  - intros [Hms Hv]. split.
-    + assumption.
-    + intros [x contra]. value'_no_step.
-Qed.
-
-Lemma st_pr_nf': forall t1' t2' nf',
-  step' t1' t2' ->
-  step'_normal_form_of t1' nf' ->
-  step'_normal_form_of t2' nf'.
-Proof.
-  intros.
-  destruct H0.
-  split; [|assumption].
-  inversion H0; subst.
-  - exfalso. eauto.
-  - pose proof (determinism' _ _ _ H H2). 
-    subst. assumption.
-Qed.
-
-Lemma st_exp_pr_nf': forall t1' t2' nf',
-  step' t1' t2' ->
-  step'_normal_form_of t2' nf' ->
-  step'_normal_form_of t1' nf'.
-Proof.
-  intros.
-  destruct H0.
-  split; [|assumption].
-  inversion H0; subst;
-    eapply multi_step; eassumption.
-Qed.
-
-Lemma multistep'_cons1' : forall t1' t2' t3',
-  multi step' t1' t2' -> multi step' (cons' t1' t3') (cons' t2' t3').
-Proof.
-  intros t1' t2' t3' Hms. induction Hms.
-    apply multi_refl.
-    eapply multi_step.
-      apply ST_Cons1'; eauto. auto.
-Qed.
-
-Lemma multistep'_cons2' : forall v1' t2' t3',
-  value' v1' ->
-  multi step' t2' t3' ->
-  multi step' (cons' v1' t2') (cons' v1' t3').
-Proof.
-  intros v1' t2' t3' Hv Hms. induction Hms.
-    apply multi_refl.
-    eapply multi_step.
-      apply ST_Cons2'; eauto. auto.
-Qed.
-
-Lemma multistep'_case1' : forall x y t1' t2' tnil' tcons',
-  multi step' t1' t2' -> multi step' (case' t1' tnil' x y tcons')
-                                 (case' t2' tnil' x y tcons').
-Proof.
-  intros x y t1' t2' tnil' tcons' Hms. induction Hms.
-    apply multi_refl.
-    eapply multi_step.
-      apply ST_Case1'; eauto. auto.
-Qed.
-
-Lemma multistep'_add1' : forall t1' t2' t3',
-  multi step' t1' t2' -> multi step' (add' t1' t3') (add' t2' t3').
-Proof.
-  intros t1' t2' t3' STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_Add1'; eauto.  auto.
-Qed.
-
-Lemma multistep'_add2' : forall v' t1' t2',
-  value' v' -> multi step' t1' t2' -> multi step' (add' v' t1') (add' v' t2').
-Proof.
-  intros v' t1' t2' V STM. induction STM.
-   apply multi_refl.
-   eapply multi_step.
-     apply ST_Add2'; eauto.  auto.
+  induction i; intros t' v' T' HT' Hms'.
+  - destruct t';
+    try discriminate;
+    try (injection Hms' as Hms'; subst; assumption).
+    simpl in Hms'.
+    destruct (is_terminal' t'1), (is_terminal' t'2);
+    try discriminate.
+    injection Hms' as Hms'; subst; assumption.
+  - apply preservation' in HT'.
+    apply mstep'_Si in Hms'.
+    eapply IHi; eassumption.
 Qed.

@@ -125,6 +125,10 @@ Fixpoint term_derivation (cfg : feat_config) (t' : tm') : option tm :=
                                  | Some t2 => Some (app t1 t2)
                                  end
                     end
+  | fixp' t' => match term_derivation cfg t' with
+                | None => None
+                | Some t => Some (fixp t)
+                end
 
   | const' n' => match derive n' cfg with
                  | None => None

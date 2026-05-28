@@ -1,4 +1,4 @@
-From STLC Require Import Ceval Lifted_Ceval.
+From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat.
 
 Inductive LR (conf:feat_config) : tm -> tm' -> Prop :=
   | LR_var: forall x, LR conf (var x) (var' x)
@@ -63,23 +63,25 @@ Proof.
       simpl; constructor; eauto.
 Qed.
 
-Lemma cstep_LR_cstep': forall conf t t',
-  LR conf t t' -> LR conf (cstep t) (cstep' t').
+Lemma step_LR_step': forall conf t t',
+  LR conf t t' -> LR conf (step t) (step' t').
 Proof.
   induction t; intros;
   inversion H; subst.
   - constructor.
+  - constructor. assumption.
   - destruct t1, t1';
     try solve_by_inverts 1;
     try (apply IHt1 in H2;
          constructor; assumption).
     simpl in *. inversion H2; subst.
     eapply subst_LR_subst'; assumption.
-  - constructor. assumption.
   - destruct t, t'0;
     try solve_by_inverts 1;
     try (apply IHt in H1;
          constructor; assumption).
+    inversion H1; subst.
+    eapply subst_LR_subst'; assumption.
   - constructor. assumption.
   - destruct t, t'0;
     try solve_by_inverts 1;
@@ -120,26 +122,47 @@ Proof.
     repeat apply subst_LR_subst'; assumption.
 Qed.
 
-Lemma mcstep_mcstep'__LR: forall conf i t t' v v',
+Lemma LR_is_terminal_eqv: forall conf t t',
   LR conf t t' ->
-  mcstep i t = Some v ->
-  mcstep' i t' = Some v' ->
+  is_terminal t = true <->
+  is_terminal' t' = true.
+Proof.
+  intros conf t t' HLR.
+  split; intro Ht;
+  induction HLR;
+  try reflexivity;
+  try discriminate;
+  inversion Ht;
+  rewrite H0;
+  apply Bool.andb_true_iff in H0 as [];
+  apply IHHLR1 in H;
+  apply IHHLR2 in H0;
+  simpl; rewrite H, H0;
+  reflexivity.
+Qed.
+
+Lemma mstep_mstep'__LR: forall conf i t t' v v',
+  LR conf t t' ->
+  mstep i t = Some v ->
+  mstep' i t' = Some v' ->
   LR conf v v'.
 Proof.
- induction i; intros t t' v v' HLR Hmc Hmc'.
-  - simpl in Hmc, Hmc'.
-    destruct t, t'; subst;
-    try discriminate;
-    try (injection Hmc as Hmc;
-    injection Hmc' as Hmc';
-    subst; assumption).
+ induction i; intros t t' v v' HLR Hms Hms'.
+  - simpl in Hms, Hms'.
+    destruct (is_terminal t) eqn:Eqt;
+    try discriminate.
+    rewrite (LR_is_terminal_eqv _ _ _ HLR) in Eqt.
+    rewrite Eqt in Hms'.
+    injection Hms as Hms.
+    injection Hms' as Hms'.
+    subst. assumption.
   - eapply IHi.
-    + eapply cstep_LR_cstep' in HLR.
+    + eapply step_LR_step' in HLR.
       exact HLR.
-    + pose proof (mcstep_Si i t v) as [H _].
+    + pose proof (mstep_Si i t v) as [H _].
       apply H. assumption.
-    + pose proof (mcstep'_Si i t' v')as [H _].
-      apply H. exact Hmc'.
+    + pose proof (mstep'_Si i t' v')as [H _].
+      apply H. exact Hms'.
 Qed.
 
 Lemma derive_LR: forall conf n' n,
@@ -159,15 +182,15 @@ Qed.
  
 Theorem commutativity: forall conf i analysis spl p r r',
   derive spl conf = Some p ->
-  mcstep i (app analysis (const p)) = Some (const r) ->
-  mcstep' i (app' (lift analysis) (const' spl)) = Some (const' r') ->
+  mstep i (app analysis (const p)) = Some (const r) ->
+  mstep' i (app' (lift analysis) (const' spl)) = Some (const' r') ->
   derive r' conf = Some r.
 Proof.
-  intros conf i analysis spl p r r' Hd Hmc Hmc'.
+  intros conf i analysis spl p r r' Hd Hms Hms'.
   pose proof (derive_LR conf spl p Hd).
   pose proof (lift_LR conf analysis).
   pose proof (LR_app _ _ _ _ _ H0 H).
-  pose proof (mcstep_mcstep'__LR _ _ _ _ _ _ H1 Hmc Hmc').
+  pose proof (mstep_mstep'__LR _ _ _ _ _ _ H1 Hms Hms').
   clear - H2.
   inversion H2; subst.
   assumption.
@@ -176,63 +199,69 @@ Qed.
 (* Proving the Commutativity Theorem
     with only 2 given hypothesis *)
 
-Lemma mcstep__LRL: forall conf i t t' v,
+Lemma mstep__LRL: forall conf i t t' v,
   LR conf t t' ->
-  mcstep i t = Some v ->
-  exists v', mcstep' i t' = Some v' /\
+  mstep i t = Some v ->
+  exists v', mstep' i t' = Some v' /\
   LR conf v v'.
 Proof.
- induction i; intros t t' v HLR Hmc.
-  - simpl in Hmc.
-    destruct t, t'; subst;
-    try solve_by_inverts 1;
-    try (eexists; split; 
-         [simpl; reflexivity|
-          injection Hmc as Hmc; subst;
-          assumption]).
-  - eapply cstep_LR_cstep' in HLR.
+ induction i; intros t t' v HLR Hms.
+  - simpl in Hms.
+    destruct (is_terminal t) eqn:Eqt;
+    try discriminate.
+    rewrite (LR_is_terminal_eqv _ _ _ HLR) in Eqt.
+    exists t'. simpl.
+    rewrite Eqt.
+    split.
+    reflexivity.
+    injection Hms as Hms.
+    subst. assumption.
+  - eapply step_LR_step' in HLR.
     eapply IHi in HLR as [v' [H1 H2]].
     + exists v'. split.
-      apply mcstep'_Si.
+      apply mstep'_Si.
       assumption. eassumption.
-    + pose proof (mcstep_Si i t v) as [H _].
+    + pose proof (mstep_Si i t v) as [H _].
       apply H. assumption.
 Qed.
 
-Lemma mcstep__LRR: forall conf i t t' v',
+Lemma mstep__LRR: forall conf i t t' v',
   LR conf t t' ->
-  mcstep' i t' = Some v' ->
-  exists v, mcstep i t = Some v /\
+  mstep' i t' = Some v' ->
+  exists v, mstep i t = Some v /\
   LR conf v v'.
 Proof.
- induction i; intros t t' v' HLR Hmc.
-  - simpl in Hmc.
-    destruct t, t'; subst;
-    try solve_by_inverts 1;
-    try (eexists; split; 
-         [simpl; reflexivity|
-          injection Hmc as Hmc; subst;
-          assumption]).
-  - eapply cstep_LR_cstep' in HLR.
+ induction i; intros t t' v' HLR Hms.
+  - simpl in Hms.
+    destruct (is_terminal' t') eqn:Eqt;
+    try discriminate.
+    rewrite <- (LR_is_terminal_eqv _ _ _ HLR) in Eqt.
+    exists t. simpl.
+    rewrite Eqt.
+    split.
+    reflexivity.
+    injection Hms as Hms.
+    subst. assumption.
+  - eapply step_LR_step' in HLR.
     eapply IHi in HLR as [v [H1 H2]].
     + exists v. split.
-      apply mcstep_Si.
+      apply mstep_Si.
       assumption. eassumption.
-    + pose proof (mcstep'_Si i t' v') as [H _].
+    + pose proof (mstep'_Si i t' v') as [H _].
       apply H. assumption.
 Qed.
 
 Theorem commutativityL: forall conf i analysis spl p r,
   derive spl conf = Some p ->
-  mcstep i (app analysis (const p)) = Some (const r) ->
-  exists r', mcstep' i (app' (lift analysis) (const' spl)) = Some (const' r') /\
+  mstep i (app analysis (const p)) = Some (const r) ->
+  exists r', mstep' i (app' (lift analysis) (const' spl)) = Some (const' r') /\
   derive r' conf = Some r.
 Proof.
-  intros conf i analysis spl p r Hd Hmc.
+  intros conf i analysis spl p r Hd Hms.
   pose proof (derive_LR conf spl p Hd).
   pose proof (lift_LR conf analysis).
   pose proof (LR_app _ _ _ _ _ H0 H).
-  pose proof (mcstep__LRL _ _ _ _ _ H1 Hmc) as [v' [H2 H3]].
+  pose proof (mstep__LRL _ _ _ _ _ H1 Hms) as [v' [H2 H3]].
   inversion H3; subst.
   eexists; split.
   + rewrite H2. reflexivity.
@@ -241,15 +270,15 @@ Qed.
 
 Theorem commutativityR: forall conf i analysis spl p r',
   derive spl conf = Some p ->
-   mcstep' i (app' (lift analysis) (const' spl)) = Some (const' r') ->
-  exists r, mcstep i (app analysis (const p)) = Some (const r)  /\
+  mstep' i (app' (lift analysis) (const' spl)) = Some (const' r') ->
+  exists r, mstep i (app analysis (const p)) = Some (const r)  /\
   derive r' conf = Some r.
 Proof.
-  intros conf i analysis spl p r' Hd Hmc'.
+  intros conf i analysis spl p r' Hd Hms'.
   pose proof (derive_LR conf spl p Hd).
   pose proof (lift_LR conf analysis).
   pose proof (LR_app _ _ _ _ _ H0 H).
-  pose proof (mcstep__LRR _ _ _ _ _ H1 Hmc') as [v [H2 H3]].
+  pose proof (mstep__LRR _ _ _ _ _ H1 Hms') as [v [H2 H3]].
   inversion H3; subst.
   eexists; split.
   + rewrite H2. reflexivity.
