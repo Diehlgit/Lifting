@@ -221,19 +221,7 @@ Proof.
     assumption.
 Qed.
 
-(* Trying to work with a general plus_n function *)
-
-Fixpoint gen_plusn (n:nat) (t:tm) : tm :=
-  match n with
-  | O => t
-  | S m => succ (gen_plusn m t)
-  end.
-
-Fixpoint gen_plusn' (n:nat) (t':tm') : tm' :=
-  match n with
-  | 0 => t'
-  | S m => succ' (gen_plusn' m t')
-  end.
+(* Trying to work with a general plusn function *)
 
 Definition plusn (n:nat): tm := abs "n" Nat (add (const n) (var "n")).
 
@@ -269,11 +257,53 @@ Proof.
     [ auto | assumption ]).
 Qed.
 
-(* Analysis function examples *)
-From STLC Require Import  Lifted_Notations Notations.
+(* Extending the plusn function to "count lines"*)
+From STLC Require Import Presence_Conditions_Notations
+  Lifted_Notations Notations.
 
-Definition plus := <{\"x" : Nat, \"y" : Nat, '"x" + '"y"}>.
-Definition plus' := lift plus.
-Compute (lift plus).
+Definition lc_body :=
+  <{ \"f" : NatList -> Nat,
+     \"l" : NatList, 
+       case '"l" of
+       | nil => 0
+       | "h" :: "t" => '"h" + ('"f" '"t")
+  }>.
 
+Definition line_count := (<{ `fixp lc_body` }>).
 
+Example line_count_wt: has_type empty line_count <{{NatList -> Nat}}>.
+Proof.
+  constructor. constructor.
+  constructor. constructor.
+  - constructor. reflexivity.
+  - constructor.
+  - constructor.
+    constructor. reflexivity.
+    econstructor.
+      econstructor. reflexivity.
+      econstructor. reflexivity.
+Qed.
+
+Compute mstep 3 <{`line_count` nil}>.
+
+Compute mstep 7 <{`line_count` [1]}>.
+
+Compute mstep 11 <{`line_count` [1; 2]}>.
+
+Compute mstep 15 <{`line_count` [1 ; 2; 2]}>.
+
+Compute mstep 19 <{`line_count` [1; 2; 2; 4]}>.
+
+Check (lift line_count).
+
+Definition spl1 := cons' (const' [(1,<["A"]>);(0, <[~"A"]>)]) nil'.
+Print spl1.
+Compute mstep' 7 (app' (lift line_count) spl1).
+
+Definition spl2 := cons' (const' [(1,<[T]>)]) (cons' (const' [(1,<["A"]>);(0, <[~"A"]>)]) nil').
+Print spl2.
+Compute mstep' 11 (app' (lift line_count) spl2).
+
+Definition spl3 := cons' (const' [(1,<[T]>)]) (cons' (const' [(1,<["A"]>);(0, <[~"A"]>)]) (cons' (const' [(1,<[T]>)]) nil')).
+Print spl3.
+Compute mstep' 15 (app' (lift line_count) spl3).
