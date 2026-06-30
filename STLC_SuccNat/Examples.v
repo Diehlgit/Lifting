@@ -273,15 +273,7 @@ Definition line_count := (<{ `fixp lc_body` }>).
 
 Example line_count_wt: has_type empty line_count <{{NatList -> Nat}}>.
 Proof.
-  constructor. constructor.
-  constructor. constructor.
-  - constructor. reflexivity.
-  - constructor.
-  - constructor.
-    constructor. reflexivity.
-    econstructor.
-      econstructor. reflexivity.
-      econstructor. reflexivity.
+  repeat (econstructor; try reflexivity).
 Qed.
 
 Compute mstep 3 <{`line_count` nil}>.

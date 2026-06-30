@@ -79,6 +79,16 @@ Proof.
   simpl. rewrite IHT'1, IHT'2. auto.
 Qed.
 
+Lemma inv_ty_ld: forall T T',
+  type_derivation T' = T <-> lift_ty T = T'.
+Proof.
+  split; intros.
+  - rewrite <- H.
+    apply lift_ty_inv_of_ty_derivation.
+  - rewrite <- H.
+    apply ty_derivation_inv_of_lift_ty.
+Qed.
+
 (* We can prove that derive' preserves well typedness *)
 
 Lemma deriving'_types: forall conf t' t T',

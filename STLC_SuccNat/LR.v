@@ -1,4 +1,4 @@
-From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat.
+From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat Derivation.
 
 Inductive LR (conf:feat_config) : tm -> tm' -> Prop :=
   | LR_var: forall x, LR conf (var x) (var' x)
@@ -172,6 +172,164 @@ Proof.
   intros. constructor. assumption.
 Qed.
 
+(* Lemmas about other variations of derivation functions *)
+
+Lemma derive'_LR: forall conf t' t,
+  derive' conf t' = Some t ->
+  LR conf t t'.
+Proof.
+  induction t'; intros;
+  try discriminate.
+  - simpl in H.
+    destruct (derive n conf) eqn:Heq;
+    try discriminate.
+    apply derive_LR in Heq.
+    injection H as H. subst.
+    assumption.
+  - simpl in H. injection H as H.
+    subst. constructor.
+  - simpl in H.
+    destruct (derive' conf t'1) eqn:Heq1;
+    try discriminate.
+    destruct (derive' conf t'2) eqn:Heq2;
+    try discriminate.
+    injection H as H.
+    rewrite <- H.
+    constructor.
+    + apply IHt'1; reflexivity.
+    + apply IHt'2; reflexivity.
+Qed.
+
+Lemma derive'_canonical_forms: forall conf t t',
+  derive' conf t' = Some t ->
+  (exists n n',  t = (const n) /\ t' = (const' n')) \/
+  (t = nil /\ t' = nil') \/
+  (exists x xs x' xs', t = (cons x xs) /\ t' = (cons' x' xs')).
+Proof.
+  intros conf t t' Hd.
+  destruct t'; intros;
+  try solve_by_inverts 1.
+  (* const *)
+  - left. simpl in Hd.
+    destruct (derive n conf);
+    try discriminate.
+    injection Hd as Hd.
+    exists n0, n.
+    split; auto.
+  (* nil *)
+  - right. left.
+    simpl in Hd.
+    injection Hd as Hd.
+    split; auto.
+  (* cons *)
+  - right. right.
+    simpl in Hd.
+    destruct (derive' conf t'1);
+    try discriminate.
+    destruct (derive' conf t'2);
+    try discriminate.
+    injection Hd as Hd.
+    exists t0, t1, t'1, t'2.
+    split; auto.
+Qed.
+
+Lemma term_derivation_LR: forall conf t' t,
+  term_derivation conf t' = Some t ->
+  LR conf t t'.
+Proof.
+  induction t'; intros;
+  try (injection H as H; subst; constructor);
+  simpl in H.
+  (* abs *)
+  - destruct (term_derivation conf t');
+    try discriminate.
+    injection H as H.
+    rename t into T'.
+    remember (type_derivation T') as T.
+    symmetry in HeqT.
+    rewrite inv_ty_ld in HeqT.
+    subst. constructor.
+    apply IHt'. reflexivity.
+  (* app *)
+  - destruct (term_derivation conf t'1);
+    try discriminate.
+    destruct (term_derivation conf t'2);
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    + apply IHt'1. reflexivity.
+    + apply IHt'2. reflexivity.
+  (* fixp *)
+  - destruct (term_derivation conf t');
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    apply IHt'. reflexivity.
+  (* const *)
+  - destruct (derive n conf) eqn:Hd;
+    try discriminate.
+    injection H as H.
+    subst.
+    constructor. assumption.
+  (* succ *)
+  - destruct (term_derivation conf t');
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    apply IHt'. reflexivity.
+  (* add *)
+  - destruct (term_derivation conf t'1);
+    try discriminate.
+    destruct (term_derivation conf t'2);
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    + apply IHt'1. reflexivity.
+    + apply IHt'2. reflexivity.
+  (* cons *)
+  - destruct (term_derivation conf t'1);
+    try discriminate.
+    destruct (term_derivation conf t'2);
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    + apply IHt'1. reflexivity.
+    + apply IHt'2. reflexivity.
+  (* case *)
+  - destruct (term_derivation conf t'1);
+    try discriminate.
+    destruct (term_derivation conf t'2);
+    try discriminate.
+    destruct (term_derivation conf t'3);
+    try discriminate.
+    injection H as H.
+    subst. constructor.
+    + apply IHt'1. reflexivity.
+    + apply IHt'2. reflexivity.
+    + apply IHt'3. reflexivity.
+Qed.
+
+Lemma LR_term_derivation: forall conf t' t,
+  LR conf t t' ->
+  term_derivation conf t' = Some t.
+Proof.
+  intros. induction H; simpl.
+  - reflexivity.
+  - rewrite IHLR1, IHLR2. reflexivity.
+  - rewrite IHLR.
+    rewrite ty_derivation_inv_of_lift_ty.
+    reflexivity.
+  - rewrite IHLR. reflexivity.
+  - rewrite H. reflexivity.
+  - rewrite IHLR. reflexivity.
+  - rewrite IHLR1, IHLR2. reflexivity.
+  - reflexivity.
+  - rewrite IHLR1, IHLR2. reflexivity.
+  - rewrite IHLR1, IHLR2, IHLR3. reflexivity.
+Qed.
+
+(* Trivially a term is always related to its lifted counterpart. *)
+
 Lemma lift_LR: forall conf t,
   LR conf t (lift t).
 Proof.
@@ -179,7 +337,18 @@ Proof.
   try (constructor; assumption).
   - constructor. reflexivity.
 Qed.
- 
+
+(* LR implies derivation existance *)
+
+Lemma LR_derive: forall conf n n',
+  LR conf (const n) (const' n') ->
+  derive n' conf = Some n.
+Proof.
+  intros. inversion H. assumption.
+Qed. 
+
+(* The main commutativity theorem *)
+
 Theorem commutativity: forall conf i analysis spl p r r',
   derive spl conf = Some p ->
   mstep i (app analysis (const p)) = Some (const r) ->
@@ -192,7 +361,41 @@ Proof.
   pose proof (LR_app _ _ _ _ _ H0 H).
   pose proof (mstep_mstep'__LR _ _ _ _ _ _ H1 Hms Hms').
   clear - H2.
-  inversion H2; subst.
+  apply LR_derive.
+  assumption.
+Qed.
+
+(* Variations of the commutativity theorem *)
+
+Theorem arbitrary_results_commutativity: forall conf i analysis spl p r r',
+  term_derivation conf spl = Some p ->
+  mstep i (app analysis p) = Some r ->
+  mstep' i (app' (lift analysis) spl) = Some r' ->
+  term_derivation conf r' = Some r.
+Proof.
+  intros conf i analysis spl p r r' Hd Hms Hms'.
+  pose proof (term_derivation_LR conf spl p Hd).
+  pose proof (lift_LR conf analysis).
+  pose proof (LR_app _ _ _ _ _ H0 H).
+  pose proof (mstep_mstep'__LR _ _ _ _ _ _ H1 Hms Hms').
+  clear - H2.
+  apply LR_term_derivation.
+  assumption.
+Qed.
+
+Theorem commutativity': forall conf i analysis spl p r r',
+  derive' conf spl = Some p ->
+  mstep i (app analysis p) = Some r ->
+  mstep' i (app' (lift analysis) spl) = Some r' ->
+  term_derivation conf r' = Some r.
+Proof.
+  intros conf i analysis spl p r r' Hd Hms Hms'.
+  pose proof (derive'_LR conf spl p Hd).
+  pose proof (lift_LR conf analysis).
+  pose proof (LR_app _ _ _ _ _ H0 H).
+  pose proof (mstep_mstep'__LR _ _ _ _ _ _ H1 Hms Hms').
+  clear - H2.
+  apply LR_term_derivation.
   assumption.
 Qed.
 
