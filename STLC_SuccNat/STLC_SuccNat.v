@@ -373,3 +373,43 @@ Proof.
     try (f_equal; eauto);
     try solve_by_inverts 2.
 Qed.
+
+Theorem normal_forms_unique: forall t1 t2 t3,
+  step_normal_form_of t1 t2 ->
+  step_normal_form_of t1 t3 ->
+  t2 = t3.
+Proof.
+  intros t1 t2 t3 P1 P2.
+  destruct P1 as [P12 Pnf2].
+  destruct P2 as [P13 Pnf3].
+  induction P12; subst;
+    inversion P13; subst;
+    try (apply (IHP12 Pnf2)).
+  - reflexivity.
+  - destruct Pnf2. eauto.
+  - destruct y; destruct Pnf3; eauto.
+  - remember (determinism _ _ _ H H0) as e. congruence.
+Qed.
+
+Theorem types_unique: forall Gamma t T1 T2,
+  has_type Gamma t T1 ->
+  has_type Gamma t T2 ->
+  T1 = T2.
+Proof.
+  intros Gamma t.
+  generalize dependent Gamma.
+  induction t; intros Gamma T1 T2 HT1 HT2;
+    inversion HT1; subst;
+    inversion HT2; subst;
+    try reflexivity.
+  - rewrite H1 in H2.
+    injection H2 as H2.
+    assumption.
+  - f_equal. eapply IHt; eassumption.
+  - pose proof (IHt1 Gamma (T3 -> T1) (T4 -> T2) H2 H3).
+    inversion H. reflexivity.
+  - pose proof (IHt Gamma (T1 -> T1) (T2 -> T2) H1 H2).
+    inversion H. reflexivity.
+  - pose proof (IHt2 Gamma T1 T2 H7 H10).
+    assumption.
+Qed.
