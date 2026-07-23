@@ -119,3 +119,46 @@ Proof.
     apply IHv1'.
     assumption.
 Qed.
+
+Definition full_coverage {T} (v' : variational_value T) : Prop :=
+  forall conf, exists v, derive v' conf = Some v.
+
+(* Open Scope string_scope.
+
+Example fc1: full_coverage [(1,pc_Feature "A");(0,pc_Not (pc_Feature "A"))].
+Proof.
+  intros conf.
+  unfold derive.
+  destruct (pc_eval conf (pc_Feature "A")) eqn:EQ.
+  - exists 1. reflexivity.
+  - exists 0. simpl. simpl in EQ.
+    rewrite EQ. simpl. reflexivity.
+Qed.  *)
+
+Definition disjoint (pc1 pc2 : pc) : Prop :=
+  forall (conf : feat_config), ~(pc_eval conf pc1 = true /\ pc_eval conf pc2 = true).
+
+Fixpoint disjointness {T} (v': variational_value T) : Prop :=
+  match v' with
+  | [] => True
+  | (_, pc) :: rest =>
+      (forall t pc', In (t, pc') rest -> disjoint pc pc') /\ disjointness rest
+  end.
+  
+(* Open Scope string_scope.
+
+Example dsjnt1: disjointness [(1,pc_Feature "A");(0,pc_Not (pc_Feature "A"))].
+Proof.
+  simpl. split; try split.
+  - intros n pc' [H | H].
+    + injection H as H.
+      rewrite <- H0.
+      intros conf [H1 H2].
+      simpl in H1, H2.
+      rewrite H1 in H2.
+      inversion H2.
+    + inversion H.
+  - intros n pc H.
+    inversion H.
+  - apply I.
+Qed. *)
