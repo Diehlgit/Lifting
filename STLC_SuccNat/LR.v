@@ -84,6 +84,7 @@ Proof.
 Qed.
 
 Lemma step_LR_step': forall conf t1 t2 t1' t2',
+  step t1 t2 -> step' t1' t2' ->
   LR conf t1 t1' -> LR conf t2 t2'.
 Proof.
   intros conf t1 t2 t1' t2' Hstep Hstep' HLR.
@@ -245,10 +246,10 @@ Qed.
 Corollary LR_reducible_iff: forall conf t1 t1',
   LR conf t1 t1' ->
   (exists t2, step t1 t2) <-> (exists t2', step' t1' t2').
-Proof.
+Proof.  
   intros. split.
-  - intros [t2 Hs]. eapply LR_step_forward; eauto.
-  - intros [t2' Hs']. eapply LR_step_backward; eauto.
+  - intros [t2 Hs]. eapply LR_step; eauto.
+  - intros [t2' Hs']. eapply LR_step'; eauto.
 Qed.
 
 Ltac value_no_step :=
