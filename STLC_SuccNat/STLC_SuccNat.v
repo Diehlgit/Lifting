@@ -52,56 +52,64 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
 (* Notation "[ x := s ] t" := (subst x s t) (at level 100).
 Check [ "t" := const 1 ] (abs "t" Nat (succ (var "t"))). *)
 
-Fixpoint step (t:tm) : tm :=
-  match t with
-  | app t1 t2 => match t1 with
-                 | abs x T b => subst x t2 b
-                 | _ => app (step t1) t2
-                 end
-  | succ t => match t with
-              | const n => const (S n)
-              | _ => succ (step t)
-              end
-  | fixp t => match t with
-              | abs x T b => subst x (fixp t) b
-              | _ => fixp (step t)
-              end
-  | add t1 t2 => match t1 with
-                 | const n1 => match t2 with
-                               | const n2 => const (n1 + n2)
-                               | _ => add t1 (step t2)
-                               end
-                 | _ => add (step t1) t2
-                 end
-  | cons t1 t2 => match t1 with
-                  | const n1 => cons t1 (step t2)
-                  | _ => cons (step t1) t2
-                  end
-  | case t1 tnil x y tcons => match t1 with
-                              | nil => tnil
-                              | cons h t => subst y t (subst x h tcons)
-                              | _ => case (step t1) tnil x y tcons
-                              end
-  | _ => t
-  end.
+Inductive step : tm -> tm -> Prop :=
+  | ST_App: forall t1 t1' t2,
+    step t1 t1' ->
+      step (app t1 t2) (app t1' t2)
+  | ST_AppAbs: forall x T t1 t2,
+    step (app (abs x T t1) t2) (subst x t2 t1)
+  | ST_FixpAbs: forall x T t1,
+    step (fixp (abs x T t1)) (app (abs x T t1) (fixp (abs x T t1)))
+  | ST_Fixp: forall t1 t2,
+    step t1 t2 ->
+      step (fixp t1) (fixp t2)
 
-Fixpoint is_terminal (t:tm) : bool :=
-  match t with
-  | var _      => true
-  | abs _ _ _  => true
-  | const _    => true
-  | nil        => true
-  | cons t1 t2 => is_terminal t1 && is_terminal t2
-  | _          => false
-  end.
+  | ST_Succ: forall t1 t2,
+    step t1 t2 ->
+      step (succ t1) (succ t2)
+  | ST_SuccConst : forall (n : nat),
+    step (succ (const n)) (const (S n))
 
-Fixpoint mstep (i:nat) (t:tm) : option tm :=
-  if (is_terminal t) then Some t
-  else match i with
-       | O => None
-       | S i' => mstep i' (step t)
-       end.  
+  | ST_Add1: forall t1 t1' t2,
+    step t1 t1' ->
+      step (add t1 t2) (add t1' t2)
+  | ST_Add2: forall v1 t2 t2',
+    value v1 ->
+    step t2 t2' ->
+      step (add v1 t2) (add v1 t2')
+  | ST_AddConst: forall (n1 n2 : nat),
+    step (add (const n1) (const n2)) (const (n1 + n2))
 
+  | ST_Cons1: forall t1 t2 t3,
+    step t1 t2 ->
+    step (cons t1 t3) (cons t2 t3)
+  | ST_Cons2: forall v t2 t3,
+    value v ->
+    step t2 t3 ->
+    step (cons v t2) (cons v t3)
+  | ST_Case1: forall x y t1 t2 tnil tcons,
+    step t1 t2 ->
+    step (case t1 tnil x y tcons) (case t2 tnil x y tcons)
+  | ST_CaseNil: forall x y tnil tcons,
+    step (case nil tnil x y tcons) tnil
+  | ST_CaseCons: forall x y vh vt tnil tcons,
+    value vh ->
+    value vt ->
+    step (case (cons vh vt) tnil x y tcons) (subst y vt (subst x vh tcons)).
+
+Inductive multi {X : Type} (R : X -> X -> Prop) : X -> X -> Prop :=
+  | multi_refl : forall (x : X), multi R x x
+  | multi_step : forall (x y z : X),
+                    R x y ->
+                    multi R y z ->
+                    multi R x z.
+
+Definition normal_form {X : Type}
+              (R : X -> X -> Prop) (t : X) : Prop :=
+  ~(exists t', R t t').
+
+Definition step_normal_form_of t t':=
+  (multi step t t' /\ normal_form step t').
 
 (*Typing*)
 Definition context := partial_map ty.
@@ -212,12 +220,6 @@ Ltac solve_by_inverts n :=
 			subst; solve_by_inverts (S n') end ]
 	end end.
 
-Theorem determinism : forall t1 t2 t3,
-  step t1 = t2 -> step t1 = t3 -> t2 = t3.
-Proof.
-  intros. subst. reflexivity.
-Qed.
-
 Lemma substitution_preserves_typing : forall Gamma x U t v T,
   has_type (x |-> U ; Gamma) t T ->
   has_type empty v U ->
@@ -252,116 +254,16 @@ Proof.
         rewrite H. assumption.
 Qed.
 
-Theorem preservation: forall t T,
-  has_type empty t T ->
-  has_type empty (step t) T.
+Lemma value_is_nf: forall t,
+  value t -> step_normal_form_of t t.
 Proof.
-  induction t; intros T HT;
-    inversion HT; subst;
-    try (apply IHt1 in H2; clear IHt1;
-    destruct t1;
-    try (econstructor; eassumption;
-    try solve_by_inverts 2)).
-  - inversion H1.
-  - assumption.
-  - simpl. inversion H2; subst.
-    eapply substitution_preserves_typing;
-    eassumption.
-  - apply IHt in H1.
-    destruct t;
-    try (constructor; assumption).
-    inversion H1; subst.
-    eapply substitution_preserves_typing.
-    eassumption. assumption.
-  - assumption.
-  - apply IHt in H1. simpl.
-    destruct t;
-    try solve_by_inverts 2;
-    try constructor; assumption.
-  - apply IHt2 in H4; clear IHt2.
-    destruct t2;
-    try solve_by_inverts 2;
-    try (constructor; assumption).
-  - assumption.
-  - apply IHt2 in H4; clear IHt2.
-    destruct t2;
-    try solve_by_inverts 2;
-    try (constructor; assumption).
-  - apply IHt1 in H6 as H.
-    destruct t1;
-    try (constructor; assumption);
-    try solve_by_inverts 2.
-    + simpl. assumption.
-    + inversion H6; subst. simpl.
-      repeat eapply substitution_preserves_typing;
-      eassumption.
-Qed.
-
-Lemma is_terminal_step: forall t,
-  is_terminal t = true -> step t = t.
-Proof.
-  intros t Ht.
-  induction t;
-  try reflexivity;
-  try discriminate.
-  simpl in Ht.
-  rewrite Bool.andb_true_iff in Ht.
-  destruct Ht.
-  apply IHt1 in H.
-  apply IHt2 in H0.
-  simpl. rewrite H, H0.
-  destruct t1;
-  reflexivity.
-Qed.
-
-Lemma value_is_terminal: forall v,
-  value v -> is_terminal v = true.
-Proof.
-  intros v Hv.
-  induction v;
-  inversion Hv;
-  try reflexivity.
-  subst.
-  apply IHv1 in H1.
-  apply IHv2 in H2.
-  simpl. rewrite H1, H2.
-  reflexivity.
-Qed.
-
-Lemma mstep_Si: forall i t v,
-  mstep (S i) t = Some v <->
-  mstep i (step t) = Some v.
-Proof.
-  split; intros;
-    rewrite <- H;
-    destruct i, t;
-    try reflexivity;
-    try (
-      destruct (is_terminal (cons t1 t2)) eqn:Eq;
-        [ apply is_terminal_step in Eq as Heq;
-        simpl in Eq;
-        rewrite Heq;
-        simpl; rewrite Eq;
-        reflexivity |
-        simpl in Eq;
-        simpl; rewrite Eq;
-        reflexivity]).
-Qed.
-
-Lemma preservation_multi: forall i t v T,
-  has_type empty t T ->
-  mstep i t = Some v ->
-  has_type empty v T.
-Proof.
-  induction i; intros t v T HT Hms.
-  - destruct t;
-    try discriminate;
-    try (injection Hms as Hms; subst; assumption).
-    simpl in Hms.
-    destruct (is_terminal t1), (is_terminal t2);
-    try discriminate.
-    injection Hms as Hms; subst; assumption.
-  - apply preservation in HT.
-    apply mstep_Si in Hms.
-    eapply IHi; eassumption.
+  induction t; intros Hv;
+  split;
+    try inversion Hv; subst;
+    try (intros [t3 Hc]; inversion Hc);
+    try constructor.
+  - subst. apply IHt1 in H1.
+    apply H1. exists t4. assumption.
+  - subst. apply IHt2 in H2.
+    apply H2. exists t4. assumption.
 Qed.

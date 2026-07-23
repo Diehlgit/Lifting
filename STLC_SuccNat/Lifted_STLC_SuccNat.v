@@ -73,55 +73,54 @@ Fixpoint subst' (x:string) (s' t': tm'): tm' :=
                                         (if (orb (eqb x y) (eqb x z)) then t3' else (subst' x s' t3'))
   end.
 
-Fixpoint step' (t':tm') : tm' :=
-  match t' with
-  | app' t1' t2' => match t1' with
-                    | abs' x T' b' => subst' x t2' b'
-                    | _ => app' (step' t1') t2'
-                    end
-  | succ' t' => match t' with
-                | const' n' => const' (List.map (fun '(n, pc) => (S n, pc)) n')
-                | _ => succ' (step' t')
-                end
-  | fixp' t' => match t' with
-                | abs' x T' b' => subst' x (fixp' t') b'
-                | _ => fixp' (step' t')
-                end
-  | add' t1' t2' => match t1' with
-                    | const' n1' => match t2' with
-                                    | const' n2' => const' (app_binop Nat.add n1' n2')
-                                    | _ => add' t1' (step' t2')
-                                    end
-                    | _ => add' (step' t1') t2'
-                    end
-  | cons' t1' t2' => match t1' with
-                     | const' n1' => cons' t1' (step' t2')
-                     | _ => cons' (step' t1') t2'
-                     end
-  | case' t1' tnil' x y tcons' => match t1' with
-                                  | nil' => tnil'
-                                  | cons' h' t' => subst' y t' (subst' x h' tcons')
-                                  | _ => case' (step' t1') tnil' x y tcons'
-                                  end
-  | _ => t'
-  end.
+Inductive step': tm' -> tm' -> Prop :=
+  | ST_App': forall t1' t1'' t2',
+    step' t1' t1'' ->
+      step' (app' t1' t2') (app' t1'' t2')
+  | ST_AppAbs': forall x T' t' v',
+    step' (app' (abs' x T' t') v') (subst' x v' t')
+  | ST_FixpAbs': forall x T' t',
+    step' (fixp' (abs' x T' t')) (app' (abs' x T' t') (fixp' (abs' x T' t')))
+  | ST_Fixp' : forall t1' t2',
+    step' t1' t2' ->
+    step' (fixp' t1') (fixp' t2')
 
-Fixpoint is_terminal' (t' : tm') : bool :=
-  match t' with
-  | var' _      => true
-  | abs' _ _ _  => true
-  | const' _    => true
-  | nil'        => true
-  | cons' t1' t2' => is_terminal' t1' && is_terminal' t2'
-  | _           => false
-  end.
+  | ST_Succ': forall t' t'',
+    step' t' t'' ->
+      step' (succ' t') (succ' t'')
+  | ST_SuccConst': forall n',
+      step' (succ' (const' n'))
+      (const' (List.map (fun '(n,pc) => ((S n), pc)) n'))
+  
+  | ST_Add1' : forall t1' t1'' t2',
+      step' t1' t1'' ->
+        step' (add' t1' t2') (add' t1'' t2')
+  | ST_Add2' : forall v1' t2' t2'',
+      value' v1' ->
+      step' t2' t2'' ->
+        step' (add' v1' t2') (add' v1' t2'')
+  | ST_AddConst' : forall n1' n2',
+      step' (add' (const' n1') (const' n2')) (const' (app_binop Nat.add n1' n2'))
 
-Fixpoint mstep' (i:nat) (t':tm') : option tm' :=
-  if (is_terminal' t') then Some t'
-  else match i with
-       | O => None
-       | S i' => mstep' i' (step' t')
-       end.  
+  | ST_Cons1': forall t1' t2' t3',
+    step' t1' t2' ->
+    step' (cons' t1' t3') (cons' t2' t3')
+  | ST_Cons2': forall v1' t2' t3',
+    value' v1' ->
+    step' t2' t3' ->
+    step' (cons' v1' t2') (cons' v1' t3')
+  | ST_Case1': forall x y t1' t2' tnil' tcons',
+    step' t1' t2' ->
+    step' (case' t1' tnil' x y tcons') (case' t2' tnil' x y tcons')
+  | ST_CaseNil': forall x y tnil' tcons',
+    step' (case' nil' tnil' x y tcons') tnil'
+  | ST_CaseCons': forall x y vh' vt' tnil' tcons',
+    value' vh' ->
+    value' vt' ->
+    step' (case' (cons' vh' vt') tnil' x y tcons') (subst' y vt' (subst' x vh' tcons')).
+
+Definition step'_normal_form_of t' t'':=
+  (multi step' t' t'' /\ normal_form step' t'').
 
 (* Typing *)
 Definition context' := partial_map ty'.
@@ -256,51 +255,6 @@ Proof.
         rewrite H. assumption.
 Qed.
 
-Theorem preservation': forall t' T',
-  has_type' empty t' T' ->
-  has_type' empty (step' t') T'.
-Proof.
-  induction t'; intros T' HT';
-    inversion HT'; subst;
-    try (apply IHt'1 in H2; clear IHt'1;
-    destruct t'1;
-    try (econstructor; eassumption;
-    try solve_by_inverts 2)).
-  - inversion H1.
-  - assumption.
-  - simpl. inversion H2; subst.
-    eapply substitution_preserves_typing';
-    eassumption.
-  - apply IHt' in H1.
-    destruct t';
-    try (constructor; assumption).
-    inversion H1; subst.
-    eapply substitution_preserves_typing'.
-    eassumption. assumption.
-  - assumption.
-  - apply IHt' in H1. simpl.
-    destruct t';
-    try solve_by_inverts 2;
-    try constructor; assumption.
-  - apply IHt'2 in H4; clear IHt'2.
-    destruct t'2;
-    try solve_by_inverts 2;
-    try (constructor; assumption).
-  - assumption.
-  - apply IHt'2 in H4; clear IHt'2.
-    destruct t'2;
-    try solve_by_inverts 2;
-    try (constructor; assumption).
-  - apply IHt'1 in H6 as H.
-    destruct t'1;
-    try (constructor; assumption);
-    try solve_by_inverts 2.
-    + simpl. assumption.
-    + inversion H6; subst. simpl.
-      repeat eapply substitution_preserves_typing';
-      eassumption.
-Qed.
-
 (* Auxialiary Mapping theorems *)
 Theorem mapping_not_change_deriving: forall (spl:nat') (cfg:feat_config) (p:nat) (analysis:nat->nat),
   derive spl cfg = Some p ->
@@ -356,12 +310,6 @@ Proof.
 Qed.
 
 (* Language Theorems *)
-
-Theorem determinism' : forall t1' t2' t3',
-  step' t1' = t2' -> step' t1' = t3' -> t2' = t3'.
-Proof.
-  intros. subst. reflexivity.
-Qed.
 
 Lemma has_type'_lookup_equiv : forall Gamma1 Gamma2 t T,
   (forall x, Gamma1 x = Gamma2 x) ->
@@ -518,92 +466,16 @@ Proof.
     try inversion Hv; auto.
 Qed.
 
-Lemma step_step': forall t1 t2,
-  step t1 = t2 ->
-  step' (lift t1) = (lift t2).
+Lemma value'_is_nf: forall t',
+  value' t' -> step'_normal_form_of t' t'.
 Proof.
-  (*TODO: to prove this we could define presence condition
-    normalization to evaluate expressions of literals *)
-Abort.
-
-Lemma is_terminal'_step': forall t',
-  is_terminal' t' = true -> step' t' = t'.
-Proof.
-  intros t' Ht'.
-  induction t';
-  try reflexivity;
-  try discriminate.
-  simpl in Ht'.
-  rewrite Bool.andb_true_iff in Ht'.
-  destruct Ht'.
-  apply IHt'1 in H.
-  apply IHt'2 in H0.
-  simpl. rewrite H, H0.
-  destruct t'1;
-  reflexivity.
-Qed.
-
-Lemma value'_is_terminal': forall v',
-  value' v' -> is_terminal' v' = true.
-Proof.
-  intros v' Hv'.
-  induction v';
-  inversion Hv';
-  try reflexivity.
-  subst.
-  apply IHv'1 in H1.
-  apply IHv'2 in H2.
-  simpl. rewrite H1, H2.
-  reflexivity.
-Qed.
-
-Lemma mstep'_Si: forall i t' v',
-  mstep' (S i) t' = Some v' <->
-  mstep' i (step' t') = Some v'.
-Proof.
-  split; intros;
-    rewrite <- H;
-    destruct i, t';
-    try reflexivity;
-    try (
-      destruct (is_terminal' (cons' t'1 t'2)) eqn:Eq;
-        [ apply is_terminal'_step' in Eq as Heq;
-        simpl in Eq;
-        rewrite Heq;
-        simpl; rewrite Eq;
-        reflexivity |
-        simpl in Eq;
-        simpl; rewrite Eq;
-        reflexivity]).
-Qed.
-
-Lemma mstep'_value: forall i v',
-  value' v' -> mstep' i v' = Some v'.
-Proof.
-  intros i v' Hv'.
-  destruct Hv';
-  try (destruct i; reflexivity).
-  - apply value'_is_terminal' in Hv'1.
-    apply value'_is_terminal' in Hv'2.
-    destruct i;
-    simpl; rewrite Hv'1, Hv'2;
-    simpl; reflexivity.
-Qed.
-
-Lemma preservation_multi': forall i t' v' T',
-  has_type' empty t' T' ->
-  mstep' i t' = Some v' ->
-  has_type' empty v' T'.
-Proof.
-  induction i; intros t' v' T' HT' Hms'.
-  - destruct t';
-    try discriminate;
-    try (injection Hms' as Hms'; subst; assumption).
-    simpl in Hms'.
-    destruct (is_terminal' t'1), (is_terminal' t'2);
-    try discriminate.
-    injection Hms' as Hms'; subst; assumption.
-  - apply preservation' in HT'.
-    apply mstep'_Si in Hms'.
-    eapply IHi; eassumption.
+  induction t'; intros Hv;
+  split;
+    try inversion Hv; subst;
+    try (intros [t1' Hc]; inversion Hc);
+    try constructor.
+  - subst. apply IHt'1 in H1.
+    apply H1. exists t2'. assumption.
+  - subst. apply IHt'2 in H2.
+    apply H2. exists t3'. assumption.
 Qed.
