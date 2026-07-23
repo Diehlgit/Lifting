@@ -479,3 +479,109 @@ Proof.
   - subst. apply IHt'2 in H2.
     apply H2. exists t3'. assumption.
 Qed.
+
+Ltac value'_no_step :=
+	match goal with
+	| [ H1: value' ?t, H2: step' ?t  _ |- _ ] =>
+		exfalso; apply value'_is_nf in H1 as [_ H1]; eauto
+  | [ H1: value' ?vh, H2: value' ?vt, H3: step' (cons' ?vh ?vt) _ |- _ ] =>
+      exfalso;
+      let Hv := fresh "Hv" in
+      pose proof (v_lcons' vh vt H1 H2) as Hv;
+      apply value'_is_nf in Hv as [_ Hv]; eauto
+end.
+
+Theorem preservation': forall t1' t2' T',
+  has_type' empty t1' T' ->
+  step' t1' t2' ->
+  has_type' empty t2' T'.
+Proof.
+  intros t1' t2' T' Ht';
+  generalize dependent t2'.
+  remember empty as Gamma'.
+  induction Ht'; intros t3' H0;
+    inversion H0; subst;
+      try (econstructor; eauto).
+  - inversion Ht'1; subst.
+    apply (T_App' _ _ _ _ _ Ht'1) in Ht'2.
+      eapply substitution_preserves_typing'.
+      eassumption.
+      inversion Ht'2; inversion H4; subst;
+      try eassumption.
+  - inversion Ht'; subst.
+    constructor. assumption.
+  - assumption.
+  - inversion Ht'1; subst.
+    repeat eapply substitution_preserves_typing';
+    eassumption.
+Qed.
+
+Lemma preservation'_multi: forall t1' t2' T',
+  has_type' empty t1' T' ->
+  multi step' t1' t2' ->
+  has_type' empty t2' T'.
+Proof.
+  intros t1' t2' T' Htype' Hmulti'.
+  induction Hmulti'.
+  - assumption.
+  - apply (preservation' _ _ _ Htype') in H.
+    apply IHHmulti'. apply H.
+Qed.
+
+Theorem progress' : forall t1' T',
+    has_type' empty t1' T' ->
+      value' t1' \/ exists t2', step' t1' t2'.
+Proof.
+  intros t1' T' Ht1'.
+  remember empty as Gamma.
+  induction Ht1'; subst Gamma';
+    try (left; solve [constructor]).
+  - inversion H.
+  - right. destruct IHHt1'1;
+    destruct IHHt1'2; unfold_exists; eauto using ST_App', ST_AppAbs';
+      eapply canonical_forms_fun' in Ht1'1 as [x0 [u Ht1']]; subst;
+      eauto; eexists; econstructor; assumption.
+  - right. destruct IHHt1'; auto.
+    + eapply canonical_forms_fun' in Ht1' as [x [u Ht1']]; subst;
+      eauto; eexists; econstructor; assumption.
+    + destruct H; eexists; eapply ST_Fixp'; eauto.
+  - right. destruct IHHt1'; eauto.
+    + eapply canonical_forms_nat' in H as [n H]; subst; eauto.
+      eexists. apply ST_SuccConst'.
+    + destruct H; eexists; eapply ST_Succ'; eauto.
+  - right. destruct IHHt1'2;
+    destruct IHHt1'1; unfold_exists; eauto using ST_Add1', ST_Add2'.
+    eapply canonical_forms_nat' in H as [n2 H]; subst; auto.
+    eapply canonical_forms_nat' in H0 as [n1 H0]; subst; auto.
+    exists (const' (app_binop Nat.add n1 n2)). apply ST_AddConst'.
+  - destruct IHHt1'1, IHHt1'2;
+      try reflexivity.
+    + left. constructor; assumption.
+    + right. destruct H0 as [t3' H0].
+      exists (cons' t1' t3'). apply ST_Cons2'; assumption.
+    + right. destruct H as [t3' H].
+      exists (cons' t3' t2'). apply ST_Cons1'; assumption.
+    + right. destruct H as [t3' H]. 
+      exists (cons' t3' t2'). apply ST_Cons1'; assumption.
+  - right. destruct IHHt1'1; try reflexivity.
+    + apply canonical_forms_list' in H as [H | [v1' [v2' [Hv1' [Hv2' H]]]]];
+      subst.
+      * exists tnil'. apply ST_CaseNil'; assumption.
+      * exists (subst' y v2' (subst' x v1' tcons')).
+        apply ST_CaseCons'; assumption.
+      * assumption.
+    + destruct H as [t2' H]. exists (case' t2' tnil' x y tcons').
+      apply ST_Case1'; assumption.
+Qed.
+
+Theorem determinism' : forall t1' t2' t3',
+  step' t1' t2' -> step' t1' t3' -> t2' = t3'.
+Proof.
+  intros t1' t2' t3' Ht.
+  generalize dependent t3'.
+  induction Ht; intros t4' Ht';
+    inversion Ht'; subst; eauto;
+    try value'_no_step;
+    try (f_equal; eauto);
+    try solve_by_inverts 1.
+Qed.
