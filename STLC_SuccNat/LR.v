@@ -1,4 +1,4 @@
-From STLC Require Import STLC_SuccNat Lifted_STLC_SuccNat Derivation.
+From STLC Require Import PCFm Lifted_PCFm Derivation.
 
 Inductive LR (conf:feat_config) : tm -> tm' -> Prop :=
   | LR_var: forall x, LR conf (var x) (var' x)

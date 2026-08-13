@@ -1,8 +1,8 @@
 -R . STLC
 Maps.v
 Presence_Conditions.v
-STLC_SuccNat.v
-Lifted_STLC_SuccNat.v
+PCFm.v
+Lifted_PCFm.v
 Environments.v
 LR.v
 Examples.v

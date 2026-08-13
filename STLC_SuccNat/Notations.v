@@ -1,4 +1,4 @@
-Require Import String STLC_SuccNat.
+Require Import String PCFm.
 
 Declare Custom Entry ty.
 Notation "<{{ e }}>" := e (e custom ty at level 99).

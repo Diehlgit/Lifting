@@ -1,5 +1,5 @@
 Require Import List String Maps.
-Require Import Presence_Conditions STLC_SuccNat Lifted_STLC_SuccNat.
+Require Import Presence_Conditions PCFm Lifted_PCFm.
 
 Import ListNotations.
 

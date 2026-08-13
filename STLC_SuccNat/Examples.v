@@ -22,7 +22,7 @@ Proof. reflexivity. Qed.
 Example pc5: pc_eval ["A"] (pc_And pc_False (pc_Feature "A")) = false.
 Proof. reflexivity. Qed.
 
-Require Import STLC_SuccNat Maps.
+Require Import PCFm Maps.
 (*Example functions plusone and plustwo*)
 Definition plusone := abs "n" Nat (succ (var "n")).
 
@@ -57,7 +57,7 @@ Proof.
   simpl. reflexivity.
 Qed.
 
-Require Import Lifted_STLC_SuccNat.
+Require Import Lifted_PCFm.
 
 (*Automatic Lifting Examples*)
 Example const1': lift (const 1) = const' [(1, pc_True)].
