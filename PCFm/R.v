@@ -32,6 +32,9 @@ Inductive R (conf:feat_config) : tm -> tm' -> Prop :=
     R conf tcons tcons' ->
     R conf (case t tnil x y tcons) (case' t' tnil' x y tcons').
 
+(* Substituting related terms t2 and t2' in already related terms
+   t1 and t1' yield related terms
+   (The relation is preserved under substitution)*)
 Lemma subst_R_subst': forall conf t1 t1' t2 t2' s,
   R conf t1 t1' ->
   R conf t2 t2' ->
