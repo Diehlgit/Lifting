@@ -83,6 +83,69 @@ Proof.
     + apply IHvalue'2; assumption.
 Qed.
 
+Lemma R_step: forall conf t1 t1' t2,
+  R conf t1 t1' -> step t1 t2 -> exists t2', step' t1' t2'.
+Proof.
+  intros conf t1 t1' t2 HR; generalize dependent t2.
+  induction HR; intros t21 Hstep; inversion Hstep; subst.
+  - apply IHHR1 in H2 as []. eexists. apply ST_App'. eassumption.
+  - inversion HR1; subst. eexists. apply ST_AppAbs'.
+  - inversion HR; subst. eexists. apply ST_FixpAbs'.
+  - apply IHHR in H0 as []. eexists. apply ST_Fixp'. eassumption.
+  - apply IHHR in H0 as []. eexists. apply ST_Succ'. eassumption.
+  - inversion HR; subst. eexists. apply ST_SuccConst'.
+  - apply IHHR1 in H2 as []. eexists. apply ST_Add1'. eassumption.
+  - apply IHHR2 in H3 as []. eexists. apply ST_Add2'.
+    + rewrite value_R_value' in H1; eassumption.
+    + eassumption.
+  - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst'.
+  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1'. eassumption.
+  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2'.
+    + rewrite value_R_value' in H1; eassumption.
+    + eassumption.
+  - apply IHHR1 in H5 as []. eexists. apply ST_Case1'. eassumption.
+  - inversion HR1; subst. eexists. apply ST_CaseNil'.
+  - inversion HR1; subst. eexists. apply ST_CaseCons'.
+    + rewrite value_R_value' in H5; eassumption.
+    + rewrite value_R_value' in H6; eassumption.
+Qed.
+
+Lemma R_step': forall conf t1 t1' t2',
+  R conf t1 t1' -> step' t1' t2' -> exists t2, step t1 t2.
+Proof.
+  intros conf t1 t1' t2 HR; generalize dependent t2.
+  induction HR; intros t21 Hstep; inversion Hstep; subst.
+  - apply IHHR1 in H2 as []. eexists. apply ST_App. eassumption.
+  - inversion HR1; subst. eexists. apply ST_AppAbs.
+  - inversion HR; subst. eexists. apply ST_FixpAbs.
+  - apply IHHR in H0 as []. eexists. apply ST_Fixp. eassumption.
+  - apply IHHR in H0 as []. eexists. apply ST_Succ. eassumption.
+  - inversion HR; subst. eexists. apply ST_SuccConst.
+  - apply IHHR1 in H2 as []. eexists. apply ST_Add1. eassumption.
+  - apply IHHR2 in H3 as []. eexists. apply ST_Add2.
+    + rewrite <- value_R_value' in H1; eassumption.
+    + eassumption.
+  - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst.
+  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1. eassumption.
+  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2.
+    + rewrite <- value_R_value' in H1; eassumption.
+    + eassumption.
+  - apply IHHR1 in H5 as []. eexists. apply ST_Case1. eassumption.
+  - inversion HR1; subst. eexists. apply ST_CaseNil.
+  - inversion HR1; subst. eexists. apply ST_CaseCons.
+    + rewrite <- value_R_value' in H5; eassumption.
+    + rewrite <- value_R_value' in H6; eassumption.
+Qed.
+
+Corollary R_redux_iff: forall conf t1 t1',
+  R conf t1 t1' ->
+  (exists t2, step t1 t2) <-> (exists t2', step' t1' t2').
+Proof.  
+  intros. split.
+  - intros [t2 Hs]. eapply R_step; eauto.
+  - intros [t2' Hs']. eapply R_step'; eauto.
+Qed.
+
 Lemma step_R_step': forall conf t1 t2 t1' t2',
   step t1 t2 -> step' t1' t2' ->
   R conf t1 t1' -> R conf t2 t2'.
@@ -189,69 +252,6 @@ Proof.
       * inversion HR1; subst. assumption.
 Qed.
 
-Lemma R_step: forall conf t1 t1' t2,
-  R conf t1 t1' -> step t1 t2 -> exists t2', step' t1' t2'.
-Proof.
-  intros conf t1 t1' t2 HR; generalize dependent t2.
-  induction HR; intros t21 Hstep; inversion Hstep; subst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_App'. eassumption.
-  - inversion HR1; subst. eexists. apply ST_AppAbs'.
-  - inversion HR; subst. eexists. apply ST_FixpAbs'.
-  - apply IHHR in H0 as []. eexists. apply ST_Fixp'. eassumption.
-  - apply IHHR in H0 as []. eexists. apply ST_Succ'. eassumption.
-  - inversion HR; subst. eexists. apply ST_SuccConst'.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Add1'. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Add2'.
-    + rewrite value_R_value' in H1; eassumption.
-    + eassumption.
-  - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst'.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1'. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2'.
-    + rewrite value_R_value' in H1; eassumption.
-    + eassumption.
-  - apply IHHR1 in H5 as []. eexists. apply ST_Case1'. eassumption.
-  - inversion HR1; subst. eexists. apply ST_CaseNil'.
-  - inversion HR1; subst. eexists. apply ST_CaseCons'.
-    + rewrite value_R_value' in H5; eassumption.
-    + rewrite value_R_value' in H6; eassumption.
-Qed.
-
-Lemma R_step': forall conf t1 t1' t2',
-  R conf t1 t1' -> step' t1' t2' -> exists t2, step t1 t2.
-Proof.
-  intros conf t1 t1' t2 HR; generalize dependent t2.
-  induction HR; intros t21 Hstep; inversion Hstep; subst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_App. eassumption.
-  - inversion HR1; subst. eexists. apply ST_AppAbs.
-  - inversion HR; subst. eexists. apply ST_FixpAbs.
-  - apply IHHR in H0 as []. eexists. apply ST_Fixp. eassumption.
-  - apply IHHR in H0 as []. eexists. apply ST_Succ. eassumption.
-  - inversion HR; subst. eexists. apply ST_SuccConst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Add1. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Add2.
-    + rewrite <- value_R_value' in H1; eassumption.
-    + eassumption.
-  - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2.
-    + rewrite <- value_R_value' in H1; eassumption.
-    + eassumption.
-  - apply IHHR1 in H5 as []. eexists. apply ST_Case1. eassumption.
-  - inversion HR1; subst. eexists. apply ST_CaseNil.
-  - inversion HR1; subst. eexists. apply ST_CaseCons.
-    + rewrite <- value_R_value' in H5; eassumption.
-    + rewrite <- value_R_value' in H6; eassumption.
-Qed.
-
-Corollary R_reducible_iff: forall conf t1 t1',
-  R conf t1 t1' ->
-  (exists t2, step t1 t2) <-> (exists t2', step' t1' t2').
-Proof.  
-  intros. split.
-  - intros [t2 Hs]. eapply R_step; eauto.
-  - intros [t2' Hs']. eapply R_step'; eauto.
-Qed.
-
 Ltac value_no_step :=
 	match goal with
 	| [ H1: value ?t, H2: step ?t  _ |- _ ] =>
@@ -262,18 +262,6 @@ Ltac value_no_step :=
              apply value_is_nf in H2 as [_ H2]; eauto
   end.
 
-Theorem determinism : forall t1 t2 t3,
-  step t1 t2 -> step t1 t3 -> t2 = t3.
-Proof.
-  intros t1 t2 t3 Ht.
-  generalize dependent t3.
-  induction Ht; intros t4 Ht';
-    inversion Ht'; subst; eauto;
-    try value_no_step;
-    try (f_equal; eauto);
-    try solve_by_inverts 2.
-Qed.
-
 Ltac value'_no_step :=
 	match goal with
 	| [ H1: value' ?t, H2: step' ?t  _ |- _ ] =>
@@ -283,18 +271,6 @@ Ltac value'_no_step :=
              apply value'_is_nf in H1 as [_ H1];
              apply value'_is_nf in H2 as [_ H2]; eauto
   end.
-
-Theorem determinism' : forall t1' t2' t3',
-  step' t1' t2' -> step' t1' t3' -> t2' = t3'.
-Proof.
-  intros t1' t2' t3' Ht.
-  generalize dependent t3'.
-  induction Ht; intros t4' Ht';
-    inversion Ht'; subst; eauto;
-    try value'_no_step;
-    try (f_equal; eauto);
-    try solve_by_inverts 1.
-Qed.
 
 Lemma mstep_mstep'__R: forall conf t1 t1' t2 t2',
   R conf t1 t1' ->
@@ -307,15 +283,11 @@ Proof.
   generalize dependent t1'.
   induction Hm1 as [ t1 | t1 t3 t2 Hstep1 Hm1' IH ];
     intros t1' HR t2' Hm2 Hnf2.
-
-  - (* t1 already stuck *)
-    inversion Hm2; subst.
+  - inversion Hm2; subst.
     + assumption.
     + exfalso. apply Hnf1.
       eapply R_step'; eauto.
-
-  - (* t1 --> t3 --> ... --> t2 *)
-    assert (Hex1' : exists t3', step' t1' t3')
+  - assert (Hex1' : exists t3', step' t1' t3')
       by (eapply R_step; eauto).
     destruct Hex1' as [t3' Hstep1'].
     assert (HR3 : R conf t3 t3') by (eapply step_R_step'; eauto).
@@ -325,6 +297,7 @@ Proof.
       subst. eapply IH; eauto.
 Qed.
 
+(* derivation existance implies R *)
 Lemma derive_R: forall conf n' n,
   derive n' conf = Some n ->
   R conf (const n) (const' n').
@@ -332,22 +305,40 @@ Proof.
   intros. constructor. assumption.
 Qed.
 
-(* Lemmas about other variations of derivation functions *)
+(* R implies derivation existance *)
+Lemma R_derive: forall conf n n',
+  R conf (const n) (const' n') ->
+  derive n' conf = Some n.
+Proof.
+  intros. inversion H. assumption.
+Qed.
 
+(* Both ways *)
+Lemma derive_R_iff: forall conf n' n,
+  derive n' conf = Some n <-> R conf (const n) (const' n').
+Proof. split. apply derive_R. apply R_derive. Qed.
+
+
+(* Lemmas about other implementations of derivation functions *)
+
+(* derive' can derive both variational naturals and variational lists *)
 Lemma derive'_R: forall conf t' t,
   derive' conf t' = Some t ->
   R conf t t'.
 Proof.
   induction t'; intros;
   try discriminate.
+  (* const *)
   - simpl in H.
     destruct (derive n conf) eqn:Heq;
     try discriminate.
     apply derive_R in Heq.
     injection H as H. subst.
     assumption.
+  (* nil *)
   - simpl in H. injection H as H.
     subst. constructor.
+  (* cons *)
   - simpl in H.
     destruct (derive' conf t'1) eqn:Heq1;
     try discriminate.
@@ -360,6 +351,8 @@ Proof.
     + apply IHt'2; reflexivity.
 Qed.
 
+(* The result of derive' can either be
+   a natural, an empty list, or a populated list *)
 Lemma derive'_canonical_forms: forall conf t t',
   derive' conf t' = Some t ->
   (exists n n',  t = (const n) /\ t' = (const' n')) \/
@@ -393,6 +386,8 @@ Proof.
     split; auto.
 Qed.
 
+(* The term_derivation function can derive any variational term
+   it is not retricted to values of the language *)
 Lemma term_derivation_R: forall conf t' t,
   term_derivation conf t' = Some t ->
   R conf t t'.
@@ -498,15 +493,6 @@ Proof.
   - constructor. reflexivity.
 Qed.
 
-(* R implies derivation existance *)
-
-Lemma R_derive: forall conf n n',
-  R conf (const n) (const' n') ->
-  derive n' conf = Some n.
-Proof.
-  intros. inversion H. assumption.
-Qed. 
-
 (* The main commutativity theorem *)
 
 Theorem commutativity: forall conf analysis spl p r r',
@@ -527,6 +513,9 @@ Qed.
 
 (* Variations of the commutativity theorem *)
 
+(* Using term derivation we can extend the commutativity theorem to
+   reason about any enconding of Software Product Line, Products,
+   Variational Results and Object Language Results *)
 Theorem arbitrary_results_commutativity: forall conf analysis spl p r r',
   term_derivation conf spl = Some p ->
   step_normal_form_of (app analysis p) r ->
@@ -543,6 +532,9 @@ Proof.
   assumption.
 Qed.
 
+(* Using derive' we can extend the commutativity theorem to
+   reason about enconding of SPls, Products and Results restricted
+   to using Natural Values and Lists of Naturals Values *)
 Theorem commutativity': forall conf analysis spl p r r',
   derive' conf spl = Some p ->
   step_normal_form_of (app analysis p) r ->
@@ -578,6 +570,9 @@ Lemma mstep__RR: forall conf t t' v',
 Proof.
 Admitted.
 
+(* The Commutativity Theorem proven without assuming
+   the existance of a normal form for the Lifted Language
+   term  *)
 Theorem commutativityL: forall conf analysis spl p r,
   derive spl conf = Some p ->
   step_normal_form_of (app analysis (const p)) (const r) ->
@@ -593,6 +588,9 @@ Proof.
   eexists; split; eassumption.
 Qed.
 
+(* The Commutativity Theorem proven without assuming
+   the existance of a normal form for the Object Language
+   term  *)
 Theorem commutativityR: forall conf analysis spl p r',
   derive spl conf = Some p ->
   step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
