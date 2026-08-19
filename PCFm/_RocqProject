@@ -1,4 +1,4 @@
--R . STLC
+-R . PCFm
 Maps.v
 Presence_Conditions.v
 PCFm.v

@@ -1,6 +1,6 @@
 From Stdlib Require Import String List.
 Import List.ListNotations.
-From STLC Require Import Maps Lifted_PCFm PCFm.
+From PCFm Require Import Maps Lifted_PCFm PCFm.
 
 
 Definition env := list (string * tm).

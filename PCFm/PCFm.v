@@ -1,4 +1,4 @@
-From STLC Require Import Maps.
+From PCFm Require Import Maps.
 Require Export Maps.
 
 (* Terms and Values *)
