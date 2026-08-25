@@ -1,5 +1,5 @@
-Require Import List String Maps.
-Require Import Presence_Conditions PCFm Lifted_PCFm.
+Require Import List String Third_Party.Maps.
+From Languages_Scheme Require Import PCFm_Base PCFm_Lifted.
 
 Import ListNotations.
 

@@ -2,8 +2,8 @@ From Stdlib Require Import String List.
 
 Import List.ListNotations.
 Open Scope list_scope.
-From PCFm Require Import PCFm Presence_Conditions.
-Require Export Presence_Conditions.
+Require Import Languages_Scheme.PCFm_Base.
+Require Export Languages_Scheme.Presence_Conditions.
 
 (* Automatic lifting *)
 Inductive ty' : Type :=

@@ -1,5 +1,4 @@
-From PCFm Require Import Maps.
-Require Export Maps.
+Require Export Third_Party.Maps.
 
 (* Terms and Values *)
 Inductive ty : Type :=

@@ -1,6 +1,6 @@
-Require Import String Lifted_PCFm List.
+Require Import String Languages_Scheme.PCFm_Lifted List.
 Import ListNotations.
-Require Import Presence_Conditions_Notations.
+Require Import Notations.Presence_Conditions.
 
 Declare Custom Entry ty'.
 Notation "'<{{ e }}>'" := e (e custom ty' at level 99).
