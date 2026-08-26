@@ -160,34 +160,46 @@ Proof.
   generalize dependent t2.
   induction HR; intros;
     try solve_by_inverts 1.
+  (* app *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2.
+    (* ST_App *)
     + constructor.
       * apply IHHR1; assumption.
       * assumption.
+    (* ST_AppAbs *)
     + inversion HR1; subst.
       apply subst_R_subst'; assumption. 
+  (* fixp *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2;
     try constructor.
     + assumption.
+    (* ST_FixpAbs *)
     + constructor. assumption.
+    (* ST_Fixp *)
     + apply IHHR; assumption.
+  (* succ *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2;
     try constructor.
+    (* ST_Succ *)
     + eapply IHHR; assumption. 
+    (* ST_SuccConst *)
     + apply mapping_not_change_deriving.
       inversion HR. assumption.
+  (* add *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2;
     try constructor.
+    (* ST_Add1 *)
     + apply IHHR1; assumption.
     + assumption.
+    (* Absurd cases *)
     + pose proof (value_R_value' conf t1 t1' HR1)
       as [_ H]. apply H in H5.
       exfalso. apply value_is_nf in H5.
@@ -204,17 +216,21 @@ Proof.
       as [H _]. apply H in H1.
       exfalso. apply value'_is_nf in H1.
       apply H1. exists t1''. assumption.
+    (* ST_Add2 *)
     + assumption.
     + apply IHHR2; assumption.
     + apply binop_not_change_deriving.
       inversion HR1; assumption.
       inversion HR2; assumption.
+  (* cons *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2;
     try constructor.
+    (* ST_Cons1 *)
     + apply IHHR1; assumption.
     + assumption.
+    (* Absurd Cases *)
     + pose proof (value_R_value' conf t t' HR1)
       as [_ H]. apply H in H5.
       exfalso. apply value_is_nf in H5.
@@ -231,14 +247,19 @@ Proof.
       as [H _]. apply H in H1.
       exfalso. apply value'_is_nf in H1.
       apply H1. exists t2'0. assumption.
+    (* ST_Cons2 *)
     + assumption.
     + apply IHHR2; assumption.
+  (* case *)
   - inversion Hstep;
     inversion Hstep'; subst;
     try solve_by_inverts 2;
     try constructor;
+    (* ST_CaseNil *)
     try assumption.
+    (* ST_Case1 *)
     + apply IHHR1; assumption.
+    (* Absurd Cases *)
     + pose proof (v_lcons' vh' vt' H12 H13).
       pose proof (value_R_value' conf t (cons' vh' vt') HR1)
       as [_ H1]. apply H1 in H.
@@ -249,6 +270,7 @@ Proof.
       as [H1 _]. apply H1 in H.
       exfalso. apply value'_is_nf in H.
       apply H. exists t2'0. assumption.
+    (* ST_CaseCons *)
     + repeat (apply subst_R_subst').
       * assumption.
       * inversion HR1; subst. assumption.
@@ -563,7 +585,24 @@ Lemma mstep__RL: forall conf t t' v,
   exists v', step'_normal_form_of t' v' /\
   R conf v v'.
 Proof.
-Admitted.
+  intros conf t t' v HR [Hms Hnf].
+  generalize dependent t'.
+  induction Hms; intros t' HR.
+  - eexists t'. split; [split|].
+    + apply multi_refl.
+    + intros Hstep.
+      apply Hnf; clear Hnf.
+      apply R_redux_iff in HR as [_ HR].
+      apply HR, Hstep.
+    + assumption.
+  - pose proof (R_step _ _ _ _ HR H) as [y' H1].
+    pose proof (step_R_step' _ _ _ _ _ H H1 HR).
+    apply (IHHms Hnf) in H0.
+    destruct H0 as [v' [[Hms' Hnf'] HR']].
+    exists v'. split; [split|]; try assumption.
+    eapply (multi_step _ _ _ _ H1) in Hms'.
+    assumption.
+Qed.
 
 Lemma mstep__RR: forall conf t t' v',
   R conf t t' ->
@@ -571,7 +610,24 @@ Lemma mstep__RR: forall conf t t' v',
   exists v, step_normal_form_of t v /\
   R conf v v'.
 Proof.
-Admitted.
+  intros conf t t' v HR [Hms' Hnf'].
+  generalize dependent t.
+  induction Hms'; intros t HR.
+  - eexists t. split; [split|].
+    + apply multi_refl.
+    + intros Hstep.
+      apply Hnf'; clear Hnf'.
+      apply R_redux_iff in HR as [HR _].
+      apply HR, Hstep.
+    + assumption.
+  - pose proof (R_step' _ _ _ _ HR H) as [y' H1].
+    pose proof (step_R_step' _ _ _ _ _ H1 H HR).
+    apply (IHHms' Hnf') in H0.
+    destruct H0 as [v [[Hms Hnf] HR']].
+    exists v. split; [split|]; try assumption.
+    eapply (multi_step _ _ _ _ H1) in Hms.
+    assumption.
+Qed.
 
 (* The Commutativity Theorem proven without assuming
    the existance of a normal form for the Lifted Language
