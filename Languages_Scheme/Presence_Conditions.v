@@ -29,19 +29,7 @@ Fixpoint pc_eval (cfg : feat_config) (pc : pc) : bool :=
 
 (* A Nat Variational Value is a list of pairs of a
    base type (T) with their corresponding presence conditions. *)
-Definition variational_value T : Type := list (T * pc).
-
-(* deriving works by finding the first presence condition that
-   is truthfull under evaluation given a configuration.
-   This definition might have consequences in regards to the
-   necessity of the Invariants needed in the article. *)
-Fixpoint derive {T} (v' : variational_value T) (cfg : feat_config) : option T :=
-  match v' with
-  | [] => None
-  | (v, pc) :: rest =>
-    if pc_eval cfg pc then Some v
-    else derive rest cfg
-  end.
+Definition variational_primitive_type T : Type := list (T * pc).
 
 (* A binary operator like addition over variational natural values
    would need to operate over all combinations of naturals and
@@ -52,7 +40,7 @@ Fixpoint derive {T} (v' : variational_value T) (cfg : feat_config) : option T :=
   ==> [(3,A/\B);(4,A/\~B);(2,~A/\B);(3,~A/\~B)]*)
 
 Fixpoint app_binop {T} (op : T -> T -> T)
-  (v1' : variational_value T) (v2' : variational_value T) : (variational_value T) :=
+  (v1' : variational_primitive_type T) (v2' : variational_primitive_type T) : (variational_primitive_type T) :=
   match v1' with
   | [] => []
   | (v1, pc1) :: rest => (map (fun '(v2, pc2) => ((op v1 v2), (pc_And pc1 pc2))) v2') ++
@@ -66,7 +54,7 @@ Compute app_binop Nat.add [(1,pc_True);(0,pc_False)] [].
 
 Compute app_binop Nat.add [] [(2,pc_True);(3,pc_False)].
 
-Lemma app_binop_distributive {T} : forall (op:T->T->T) (v1' v2':variational_value T) (v:T) (p:pc),
+Lemma app_binop_distributive {T} : forall (op:T->T->T) (v1' v2':variational_primitive_type T) (v:T) (p:pc),
   app_binop op ((v, p) :: v1') v2' =
   (app_binop op [(v, p)] v2') ++ (app_binop op v1' v2').
 Proof.
@@ -78,87 +66,3 @@ Proof.
     f_equal. rewrite app_nil_r.
     reflexivity.
 Qed.
-
-Lemma derive_l {T} : forall (conf:feat_config) (v1' v2':variational_value T) (v:T),
-  derive v1' conf = Some v ->
-  derive (v1' ++ v2') conf = Some v.
-Proof.
-  intros. induction v1'; simpl.
-  - inversion H.
-  - destruct a, (pc_eval conf p) eqn:Eq;
-      simpl in H; rewrite Eq in H.
-    + assumption.
-    + apply IHv1', H.
-Qed.
-
-Lemma derive_binop_none {T} : forall (conf:feat_config) (op:T->T->T)
-                              (v':variational_value T) (n:T) (p:pc),
-  pc_eval conf p = false ->
-  derive (app_binop op [(n, p)] v') conf = None.
-Proof.
-  intros. simpl.
-  rewrite app_nil_r.
-  induction v'.
-  - reflexivity.
-  - destruct a. simpl.
-    rewrite H. simpl.
-    auto.
-Qed.
-
-Lemma derive_r {T} : forall (conf:feat_config) (v1' v2':variational_value T) (r:option T),
-  derive v1' conf = None ->
-  derive v2' conf = r ->
-  derive (v1' ++ v2') conf = r.
-Proof.
-  intros. induction v1'; simpl.
-  - auto.
-  - destruct a; simpl.
-    simpl in H.
-    destruct (pc_eval conf p).
-    inversion H.
-    apply IHv1'.
-    assumption.
-Qed.
-
-Definition full_coverage {T} (v' : variational_value T) : Prop :=
-  forall conf, exists v, derive v' conf = Some v.
-
-(* Open Scope string_scope.
-
-Example fc1: full_coverage [(1,pc_Feature "A");(0,pc_Not (pc_Feature "A"))].
-Proof.
-  intros conf.
-  unfold derive.
-  destruct (pc_eval conf (pc_Feature "A")) eqn:EQ.
-  - exists 1. reflexivity.
-  - exists 0. simpl. simpl in EQ.
-    rewrite EQ. simpl. reflexivity.
-Qed.  *)
-
-Definition disjoint (pc1 pc2 : pc) : Prop :=
-  forall (conf : feat_config), ~(pc_eval conf pc1 = true /\ pc_eval conf pc2 = true).
-
-Fixpoint disjointness {T} (v': variational_value T) : Prop :=
-  match v' with
-  | [] => True
-  | (_, pc) :: rest =>
-      (forall t pc', In (t, pc') rest -> disjoint pc pc') /\ disjointness rest
-  end.
-  
-(* Open Scope string_scope.
-
-Example dsjnt1: disjointness [(1,pc_Feature "A");(0,pc_Not (pc_Feature "A"))].
-Proof.
-  simpl. split; try split.
-  - intros n pc' [H | H].
-    + injection H as H.
-      rewrite <- H0.
-      intros conf [H1 H2].
-      simpl in H1, H2.
-      rewrite H1 in H2.
-      inversion H2.
-    + inversion H.
-  - intros n pc H.
-    inversion H.
-  - apply I.
-Qed. *)

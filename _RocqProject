@@ -3,7 +3,8 @@ Third_Party/Maps.v
 Languages_Scheme/Presence_Conditions.v
 Languages_Scheme/PCFm_Base.v
 Languages_Scheme/PCFm_Lifted.v
-Languages_Scheme/Derivation.v
+Lifting/Lifting.v
+Derivation/Derivation.v
 Commutativity/R.v
 Notations/PCFm_Base.v
 Notations/Presence_Conditions.v

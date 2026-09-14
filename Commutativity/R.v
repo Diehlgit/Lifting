@@ -1,4 +1,5 @@
-From Languages_Scheme Require Import PCFm_Base PCFm_Lifted Derivation.
+From Languages_Scheme Require Import PCFm_Base PCFm_Lifted.
+Require Import Lifting.Lifting Derivation.Derivation.
 
 Inductive R (conf:feat_config) : tm -> tm' -> Prop :=
   | R_var: forall x, R conf (var x) (var' x)
@@ -12,7 +13,7 @@ Inductive R (conf:feat_config) : tm -> tm' -> Prop :=
   | R_fixp: forall t t',
     R conf t t' -> R conf (fixp t) (fixp' t')
   | R_const: forall n n',
-    derive n' conf = Some n ->
+    derive conf (const' n') = Some (const n) ->
     R conf (const n) (const' n')
   | R_succ: forall t t',
     R conf t t' ->
@@ -147,7 +148,7 @@ Proof.
   intros. split.
   - intros [t2 Hs]. eapply R_step; eauto.
   - intros [t2' Hs']. eapply R_step'; eauto.
-Qed.
+Qed.    
 
 Lemma step_R_step': forall conf t1 t2 t1' t2',
   step t1 t2 -> step' t1' t2' ->
@@ -161,120 +162,118 @@ Proof.
   induction HR; intros;
     try solve_by_inverts 1.
   (* app *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2.
+  - inversion Hstep; subst.
     (* ST_App *)
-    + constructor.
-      * apply IHHR1; assumption.
-      * assumption.
+    + rename t1'0 into t0.
+      pose proof (R_redux_iff conf t1 t1' HR1) as [[t0' H] _]; eauto.
+      pose proof (ST_App' t1' t0' t2' H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor; 
+      [ apply IHHR1; assumption |
+        assumption ].
     (* ST_AppAbs *)
     + inversion HR1; subst.
-      apply subst_R_subst'; assumption. 
+      inversion Hstep'; subst.
+      inversion H2.
+      apply subst_R_subst'; assumption.
   (* fixp *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2;
-    try constructor.
-    + assumption.
+  - inversion Hstep; subst.
     (* ST_FixpAbs *)
-    + constructor. assumption.
+    + inversion HR; subst.
+      inversion Hstep'; subst; try solve_by_inverts 1.
+      repeat constructor; assumption.
     (* ST_Fixp *)
-    + apply IHHR; assumption.
+    + pose proof (R_redux_iff conf t t' HR) as [[t0' H] _]; eauto.
+      pose proof (ST_Fixp' t' t0' H).
+      pose proof (determinism' _ _ _ Hstep' H1); subst.
+      constructor.
+      apply IHHR; assumption.
   (* succ *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2;
-    try constructor.
+  - inversion Hstep; subst.
     (* ST_Succ *)
-    + eapply IHHR; assumption. 
+    + pose proof (R_redux_iff conf t t' HR) as [[t0' H] _]; eauto.
+      pose proof (ST_Succ' t' t0' H).
+      pose proof (determinism' _ _ _ Hstep' H1); subst.
+      constructor. auto.
     (* ST_SuccConst *)
-    + apply mapping_not_change_deriving.
-      inversion HR. assumption.
+    + inversion HR; subst.
+      inversion Hstep'; subst; try solve_by_inverts 1.
+      constructor. simpl.
+      rewrite mapping_not_change_deriving with (p:=n).
+      reflexivity. simpl in H0. 
+      destruct (derive_primitive n' conf); try discriminate.
+      injection H0 as H0. subst. reflexivity.
   (* add *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2;
-    try constructor.
+  - inversion Hstep; subst.
     (* ST_Add1 *)
-    + apply IHHR1; assumption.
-    + assumption.
-    (* Absurd cases *)
-    + pose proof (value_R_value' conf t1 t1' HR1)
-      as [_ H]. apply H in H5.
-      exfalso. apply value_is_nf in H5.
-      apply H5. exists t1'0. assumption.
-    + pose proof (value_R_value' conf t1 t1' HR1)
-      as [_ H]. apply H in H5.
-      exfalso. apply value_is_nf in H5.
-      apply H5. exists t1'0. assumption.
-    + pose proof (value_R_value' conf t1 t1' HR1)
-      as [H _]. apply H in H1.
-      exfalso. apply value'_is_nf in H1.
-      apply H1. exists t1''. assumption.
-    + pose proof (value_R_value' conf t1 t1' HR1)
-      as [H _]. apply H in H1.
-      exfalso. apply value'_is_nf in H1.
-      apply H1. exists t1''. assumption.
+    + rename t1'0 into t0.
+      pose proof (R_redux_iff _ _ _ HR1) as [[t0' H] _]; eauto.
+      pose proof (ST_Add1' _ _ t2' H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor;
+      [ apply IHHR1; assumption |
+        assumption ].
     (* ST_Add2 *)
-    + assumption.
-    + apply IHHR2; assumption.
-    + apply binop_not_change_deriving.
-      inversion HR1; assumption.
-      inversion HR2; assumption.
+    + apply (value_R_value' _ _ _ HR1) in H1.
+      pose proof (R_redux_iff _ _ _ HR2) as [[t2'1' H] _]; eauto.
+      pose proof (ST_Add2' _ _ _ H1 H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor;
+      [ assumption |
+        apply IHHR2; assumption].
+    (* ST_AddConst *)
+    + inversion HR1;
+      inversion HR2; subst.
+      inversion Hstep';
+        try solve_by_inverts 1; subst.
+      clear - HR1 HR2 H0 H3.
+      constructor. simpl.
+      rewrite binop_not_change_deriving with (p1:=n1) (p2:=n2).
+      * reflexivity.
+      * simpl in H0. destruct (derive_primitive n' conf).
+        inversion H0; subst. reflexivity.
+        discriminate.
+      * simpl in H3. destruct (derive_primitive n'0 conf).
+        inversion H3; subst. reflexivity.
+        discriminate.
   (* cons *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2;
-    try constructor.
+  - inversion Hstep; subst.
     (* ST_Cons1 *)
-    + apply IHHR1; assumption.
-    + assumption.
-    (* Absurd Cases *)
-    + pose proof (value_R_value' conf t t' HR1)
-      as [_ H]. apply H in H5.
-      exfalso. apply value_is_nf in H5.
-      apply H5. exists t0. assumption.
-    + pose proof (value_R_value' conf t t' HR1)
-      as [_ H]. apply H in H5.
-      exfalso. apply value_is_nf in H5.
-      apply H5. exists t0. assumption.
-    + pose proof (value_R_value' conf t t' HR1)
-      as [H _]. apply H in H1.
-      exfalso. apply value'_is_nf in H1.
-      apply H1. exists t2'0. assumption.
-    + pose proof (value_R_value' conf t t' HR1)
-      as [H _]. apply H in H1.
-      exfalso. apply value'_is_nf in H1.
-      apply H1. exists t2'0. assumption.
+    + pose proof (R_redux_iff _ _ _ HR1) as [[t0' H] _]; eauto.
+      pose proof (ST_Cons1' _ _ h' H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor;
+      [ apply IHHR1; assumption |
+        assumption].
     (* ST_Cons2 *)
-    + assumption.
-    + apply IHHR2; assumption.
+    + apply (value_R_value' _ _ _ HR1) in H1.
+      pose proof (R_redux_iff _ _ _ HR2) as [[t3' H] _]; eauto.
+      pose proof (ST_Cons2' _ _ _ H1 H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor;
+      [ assumption |
+        apply IHHR2; assumption].
   (* case *)
-  - inversion Hstep;
-    inversion Hstep'; subst;
-    try solve_by_inverts 2;
-    try constructor;
-    (* ST_CaseNil *)
-    try assumption.
+  - inversion Hstep; subst.
     (* ST_Case1 *)
-    + apply IHHR1; assumption.
-    (* Absurd Cases *)
-    + pose proof (v_lcons' vh' vt' H12 H13).
-      pose proof (value_R_value' conf t (cons' vh' vt') HR1)
-      as [_ H1]. apply H1 in H.
-      exfalso. apply value_is_nf in H.
-      apply H. exists t0. assumption.
-    + pose proof (v_lcons vh vt H5 H6).
-      pose proof (value_R_value' conf (cons vh vt) t' HR1)
-      as [H1 _]. apply H1 in H.
-      exfalso. apply value'_is_nf in H.
-      apply H. exists t2'0. assumption.
+    + pose proof (R_redux_iff _ _ _ HR1) as [[t0' H] _]; eauto.
+      pose proof (ST_Case1' x y _ _ tnil' tcons' H).
+      pose proof (determinism' _ _ _ Hstep' H0); subst.
+      constructor; try assumption.
+      apply IHHR1; assumption.
+    (* ST_CaseNil *)
+    + inversion HR1; subst.
+      inversion Hstep';
+        subst; try solve_by_inverts 1.
+      assumption.
     (* ST_CaseCons *)
-    + repeat (apply subst_R_subst').
-      * assumption.
-      * inversion HR1; subst. assumption.
-      * inversion HR1; subst. assumption.
+    + inversion HR1; subst.
+      rename t'0 into vh', h' into vt'.
+      apply (value_R_value' _ _ _ H1) in H5.
+      apply (value_R_value' _ _ _ H3) in H6.
+      inversion Hstep';
+        subst; try value'_no_step.
+      repeat apply subst_R_subst'; assumption.
 Qed.
 
 Ltac value_no_step :=
@@ -323,189 +322,58 @@ Proof.
 Qed.
 
 (* derivation existance implies R *)
-Lemma derive_R: forall conf n' n,
-  derive n' conf = Some n ->
+(* Lemma derive_R: forall conf n' n,
+  derive conf (const' n') = Some (const n) ->
   R conf (const n) (const' n').
 Proof.
   intros. constructor. assumption.
-Qed.
+Qed. *)
 
 (* R implies derivation existance *)
-Lemma R_derive: forall conf n n',
+(* Lemma R_derive: forall conf n n',
   R conf (const n) (const' n') ->
-  derive n' conf = Some n.
+  derive conf (const' n') = Some (const n).
 Proof.
   intros. inversion H. assumption.
-Qed.
+Qed. *)
 
 (* Both ways *)
-Lemma derive_R_iff: forall conf n' n,
-  derive n' conf = Some n <-> R conf (const n) (const' n').
-Proof. split. apply derive_R. apply R_derive. Qed.
+(* Lemma derive_R_iff: forall conf n' n,
+  derive conf (const' n') = Some (const n) <-> R conf (const n) (const' n').
+Proof. split. apply derive_R. apply R_derive. Qed. *)
 
 
 (* Lemmas about other implementations of derivation functions *)
 
 (* derive' can derive both variational naturals and variational lists *)
-Lemma derive'_R: forall conf t' t,
-  derive' conf t' = Some t ->
+Lemma derive_R: forall conf t' t,
+  derive conf t' = Some t ->
   R conf t t'.
 Proof.
   induction t'; intros;
   try discriminate.
   (* const *)
   - simpl in H.
-    destruct (derive n conf) eqn:Heq;
+    destruct (derive_primitive n conf) eqn:Heq;
     try discriminate.
-    apply derive_R in Heq.
     injection H as H. subst.
-    assumption.
+    constructor.
+    simpl. rewrite Heq.
+    reflexivity.
   (* nil *)
   - simpl in H. injection H as H.
     subst. constructor.
   (* cons *)
   - simpl in H.
-    destruct (derive' conf t'1) eqn:Heq1;
+    destruct (derive conf t'1) eqn:Heq1;
     try discriminate.
-    destruct (derive' conf t'2) eqn:Heq2;
+    destruct (derive conf t'2) eqn:Heq2;
     try discriminate.
     injection H as H.
     rewrite <- H.
     constructor.
     + apply IHt'1; reflexivity.
     + apply IHt'2; reflexivity.
-Qed.
-
-(* The result of derive' can either be
-   a natural, an empty list, or a populated list *)
-Lemma derive'_canonical_forms: forall conf t t',
-  derive' conf t' = Some t ->
-  (exists n n',  t = (const n) /\ t' = (const' n')) \/
-  (t = nil /\ t' = nil') \/
-  (exists x xs x' xs', t = (cons x xs) /\ t' = (cons' x' xs')).
-Proof.
-  intros conf t t' Hd.
-  destruct t'; intros;
-  try solve_by_inverts 1.
-  (* const *)
-  - left. simpl in Hd.
-    destruct (derive n conf);
-    try discriminate.
-    injection Hd as Hd.
-    exists n0, n.
-    split; auto.
-  (* nil *)
-  - right. left.
-    simpl in Hd.
-    injection Hd as Hd.
-    split; auto.
-  (* cons *)
-  - right. right.
-    simpl in Hd.
-    destruct (derive' conf t'1);
-    try discriminate.
-    destruct (derive' conf t'2);
-    try discriminate.
-    injection Hd as Hd.
-    exists t0, t1, t'1, t'2.
-    split; auto.
-Qed.
-
-(* The term_derivation function can derive any variational term
-   it is not retricted to values of the language *)
-Lemma term_derivation_R: forall conf t' t,
-  term_derivation conf t' = Some t ->
-  R conf t t'.
-Proof.
-  induction t'; intros;
-  try (injection H as H; subst; constructor);
-  simpl in H.
-  (* abs *)
-  - destruct (term_derivation conf t');
-    try discriminate.
-    injection H as H.
-    rename t into T'.
-    remember (type_derivation T') as T.
-    symmetry in HeqT.
-    rewrite inv_ty_ld in HeqT.
-    subst. constructor.
-    apply IHt'. reflexivity.
-  (* app *)
-  - destruct (term_derivation conf t'1);
-    try discriminate.
-    destruct (term_derivation conf t'2);
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    + apply IHt'1. reflexivity.
-    + apply IHt'2. reflexivity.
-  (* fixp *)
-  - destruct (term_derivation conf t');
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    apply IHt'. reflexivity.
-  (* const *)
-  - destruct (derive n conf) eqn:Hd;
-    try discriminate.
-    injection H as H.
-    subst.
-    constructor. assumption.
-  (* succ *)
-  - destruct (term_derivation conf t');
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    apply IHt'. reflexivity.
-  (* add *)
-  - destruct (term_derivation conf t'1);
-    try discriminate.
-    destruct (term_derivation conf t'2);
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    + apply IHt'1. reflexivity.
-    + apply IHt'2. reflexivity.
-  (* cons *)
-  - destruct (term_derivation conf t'1);
-    try discriminate.
-    destruct (term_derivation conf t'2);
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    + apply IHt'1. reflexivity.
-    + apply IHt'2. reflexivity.
-  (* case *)
-  - destruct (term_derivation conf t'1);
-    try discriminate.
-    destruct (term_derivation conf t'2);
-    try discriminate.
-    destruct (term_derivation conf t'3);
-    try discriminate.
-    injection H as H.
-    subst. constructor.
-    + apply IHt'1. reflexivity.
-    + apply IHt'2. reflexivity.
-    + apply IHt'3. reflexivity.
-Qed.
-
-Lemma R_term_derivation: forall conf t' t,
-  R conf t t' ->
-  term_derivation conf t' = Some t.
-Proof.
-  intros. induction H; simpl.
-  - reflexivity.
-  - rewrite IHR1, IHR2. reflexivity.
-  - rewrite IHR.
-    rewrite ty_derivation_inv_of_lift_ty.
-    reflexivity.
-  - rewrite IHR. reflexivity.
-  - rewrite H. reflexivity.
-  - rewrite IHR. reflexivity.
-  - rewrite IHR1, IHR2. reflexivity.
-  - reflexivity.
-  - rewrite IHR1, IHR2. reflexivity.
-  - rewrite IHR1, IHR2, IHR3. reflexivity.
 Qed.
 
 (* Trivially a term is always related to its lifted counterpart. *)
@@ -518,66 +386,35 @@ Proof.
   - constructor. reflexivity.
 Qed.
 
-(* The main commutativity theorem *)
+(* Analyses results are limted to number and list values.
+   An analysis function that returns functions as analysis results
+   is out of the scope of this theory. Although it should be 
+   possible to reason about by extending the notion of derivation. *)
 
-Theorem commutativity: forall conf analysis spl p r r',
-  derive spl conf = Some p ->
-  step_normal_form_of (app analysis (const p)) (const r) ->
-  step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
-  derive r' conf = Some r.
+Inductive analysis_result: tm -> Prop :=
+  | v_nat : forall n, analysis_result (const n)
+  | v_lnil : analysis_result nil
+  | v_lcons : forall v1 v2, analysis_result v1 ->
+                            analysis_result v2 ->
+                            analysis_result (cons v1 v2).
+
+Lemma analysis_result_derives: forall conf r r',
+  analysis_result r ->
+  R conf r r' ->
+  derive conf r' = Some r.
 Proof.
-  intros conf analysis spl p r r' Hd Hms Hms'.
-  pose proof (derive_R conf spl p Hd).
-  pose proof (lift_R conf analysis).
-  pose proof (R_app _ _ _ _ _ H0 H).
-  pose proof (mstep_mstep'__R _ _ _ _ _ H1 Hms Hms').
-  clear - H2.
-  apply R_derive.
-  assumption.
+  intros conf r r' Hr HR.
+  generalize dependent r'.
+  induction Hr; intros;
+  inversion HR; subst.
+  - assumption.
+  - reflexivity.
+  - apply IHHr2 in H3.
+    inversion HR; subst.
+    apply IHHr1 in H4.
+    simpl. rewrite H4, H3.
+    reflexivity.
 Qed.
-
-(* Variations of the commutativity theorem *)
-
-(* Using term derivation we can extend the commutativity theorem to
-   reason about any enconding of Software Product Line, Products,
-   Variational Results and Object Language Results *)
-Theorem arbitrary_results_commutativity: forall conf analysis spl p r r',
-  term_derivation conf spl = Some p ->
-  step_normal_form_of (app analysis p) r ->
-  step'_normal_form_of (app' (lift analysis) spl) r' ->
-  term_derivation conf r' = Some r.
-Proof.
-  intros conf analysis spl p r r' Hd Hms Hms'.
-  pose proof (term_derivation_R conf spl p Hd).
-  pose proof (lift_R conf analysis).
-  pose proof (R_app _ _ _ _ _ H0 H).
-  pose proof (mstep_mstep'__R _ _ _ _ _ H1 Hms Hms').
-  clear - H2.
-  apply R_term_derivation.
-  assumption.
-Qed.
-
-(* Using derive' we can extend the commutativity theorem to
-   reason about enconding of SPls, Products and Results restricted
-   to using Natural Values and Lists of Naturals Values *)
-Theorem commutativity': forall conf analysis spl p r r',
-  derive' conf spl = Some p ->
-  step_normal_form_of (app analysis p) r ->
-  step'_normal_form_of (app' (lift analysis) spl) r' ->
-  term_derivation conf r' = Some r.
-Proof.
-  intros conf analysis spl p r r' Hd Hms Hms'.
-  pose proof (derive'_R conf spl p Hd).
-  pose proof (lift_R conf analysis).
-  pose proof (R_app _ _ _ _ _ H0 H).
-  pose proof (mstep_mstep'__R _ _ _ _ _ H1 Hms Hms').
-  clear - H2.
-  apply R_term_derivation.
-  assumption.
-Qed.
-
-(* Proving the Commutativity Theorem
-    with only 2 given hypothesis *)
 
 Lemma mstep__RL: forall conf t t' v,
   R conf t t' ->
@@ -604,63 +441,20 @@ Proof.
     assumption.
 Qed.
 
-Lemma mstep__RR: forall conf t t' v',
-  R conf t t' ->
-  step'_normal_form_of t' v' ->
-  exists v, step_normal_form_of t v /\
-  R conf v v'.
+Theorem commutativity': forall conf analysis spl p r,
+  derive conf spl = Some p ->
+  analysis_result r ->
+  step_normal_form_of (app analysis p) r ->
+  exists r', step'_normal_form_of (app' (lift analysis) spl) r' /\
+  derive conf r' = Some r.
 Proof.
-  intros conf t t' v HR [Hms' Hnf'].
-  generalize dependent t.
-  induction Hms'; intros t HR.
-  - eexists t. split; [split|].
-    + apply multi_refl.
-    + intros Hstep.
-      apply Hnf'; clear Hnf'.
-      apply R_redux_iff in HR as [HR _].
-      apply HR, Hstep.
-    + assumption.
-  - pose proof (R_step' _ _ _ _ HR H) as [y' H1].
-    pose proof (step_R_step' _ _ _ _ _ H1 H HR).
-    apply (IHHms' Hnf') in H0.
-    destruct H0 as [v [[Hms Hnf] HR']].
-    exists v. split; [split|]; try assumption.
-    eapply (multi_step _ _ _ _ H1) in Hms.
-    assumption.
-Qed.
-
-(* The Commutativity Theorem proven without assuming
-   the existance of a normal form for the Lifted Language
-   term  *)
-Theorem commutativityL: forall conf analysis spl p r,
-  derive spl conf = Some p ->
-  step_normal_form_of (app analysis (const p)) (const r) ->
-  exists r', step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') /\
-  derive r' conf = Some r.
-Proof.
-  intros conf analysis spl p r Hd Hms.
+  intros conf analysis spl p r Hd Hr Hms.
   pose proof (derive_R conf spl p Hd).
   pose proof (lift_R conf analysis).
   pose proof (R_app _ _ _ _ _ H0 H).
-  pose proof (mstep__RL _ _ _ _ H1 Hms) as [v' [H2 H3]].
-  inversion H3; subst.
-  eexists; split; eassumption.
-Qed.
-
-(* The Commutativity Theorem proven without assuming
-   the existance of a normal form for the Object Language
-   term  *)
-Theorem commutativityR: forall conf analysis spl p r',
-  derive spl conf = Some p ->
-  step'_normal_form_of (app' (lift analysis) (const' spl)) (const' r') ->
-  exists r, step_normal_form_of (app analysis (const p)) (const r)  /\
-  derive r' conf = Some r.
-Proof.
-  intros conf analysis spl p r' Hd Hms'.
-  pose proof (derive_R conf spl p Hd).
-  pose proof (lift_R conf analysis).
-  pose proof (R_app _ _ _ _ _ H0 H).
-  pose proof (mstep__RR _ _ _ _ H1 Hms') as [v [H2 H3]].
-  inversion H3; subst.
-  eexists; split; eassumption.
+  pose proof (mstep__RL _ _ _ _ H1 Hms) as [r' [H2 H3]].
+  clear - H2 H3 Hr.
+  pose proof (analysis_result_derives conf r r' Hr H3).
+  exists r'; split;
+  assumption.
 Qed.
