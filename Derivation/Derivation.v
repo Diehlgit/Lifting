@@ -289,3 +289,16 @@ Proof.
       { apply derive_binop_none. assumption. }
       { apply IHv1'; assumption. }
 Qed.
+
+(* derivation existance implies derive_primitive exists *)
+Lemma derive_to_primitive: forall conf n' n,
+  derive conf (const' n') = Some (const n) ->
+  derive_primitive n' conf = Some n.
+Proof.
+  intros.
+  simpl in H.
+  destruct (derive_primitive n' conf); [
+    injection H as; subst; reflexivity |
+    discriminate
+  ].
+Qed.
