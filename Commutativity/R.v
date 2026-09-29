@@ -161,91 +161,6 @@ Qed.
    yields related terms *)
 Lemma step_R_step' : forall conf t1 t1',
   R conf t1 t1' ->
-  forall t2, step t1 t2 -> exists t2', R conf t2 t2'.
-Proof.
-  intros conf t1 t1' HR.
-  induction HR; intros t20 Hstep;
-    try solve_by_inverts 1.
-  (* app *)
-  - inversion Hstep; subst.
-    (* ST_App *)
-    + apply IHHR1 in H2 as [t' H2].
-      exists (app' t' t2').
-      constructor; assumption.
-    (* ST_AppAbs *)
-    + inversion HR1; subst.
-      exists (subst' x t2' t').
-      apply subst_R_subst'; assumption.
-  (* fixp *)
-  - inversion Hstep; subst.
-    (* ST_FixpAbs *)
-    + inversion HR; subst.
-      eexists; repeat econstructor; eassumption.
-    (* ST_Fixp *)
-    + apply IHHR in H0 as [t2' H0].
-      exists (fixp' t2').
-      constructor. assumption.
-  (* succ *)
-  - inversion Hstep; subst.
-    (* ST_Succ *)
-    + apply IHHR in H0 as [t2' H0].
-      exists (succ' t2').
-      constructor. assumption.
-    (* ST_SuccConst *)
-    + inversion HR; subst.
-      apply derive_to_primitive in H0.
-      apply mapping_not_change_deriving with (f:=S) in H0.
-      eexists. econstructor.
-      simpl. erewrite H0.
-      reflexivity.
-  (* add *)
-  - inversion Hstep; subst.
-    (* ST_Add1 *)
-    + rename t1'0 into t0.
-      apply IHHR1 in H2 as [t0' H2].
-      exists (add' t0' t2').
-      constructor; assumption.
-    (* ST_Add2 *)
-    + rename t2'0 into t3.
-      apply IHHR2 in H3 as [t3' H3].
-      exists (add' t1' t3').
-      constructor; assumption.
-    (* ST_AddConst *)
-    + clear IHHR1 IHHR2.
-      inversion HR1;
-      inversion HR2; subst.
-      exists (const' (app_binop Nat.add n' n'0)).
-      apply derive_to_primitive in H0, H3.
-      pose proof (binop_not_change_deriving _ _ _ _ _ Nat.add H0 H3).
-      constructor. simpl.
-      rewrite H. reflexivity.
-  (* cons *)
-  - inversion Hstep; subst.
-    (* ST_Cons1 *)
-    + apply IHHR1 in H2 as [t2' H].
-      exists (cons' t2' t').
-      constructor; assumption.
-    (* ST_Cons2 *)
-    + apply (value_R_value' _ _ _ HR1) in H1.
-      apply IHHR2 in H3 as [t3' H].
-      exists (cons' h' t3').
-      constructor; assumption.
-  (* case *)
-  - inversion Hstep; subst.
-    (* ST_Case1 *)
-    + apply IHHR1 in H5 as [t2' H5].
-    exists (case' t2' tnil' x y tcons').
-    constructor; assumption.
-    (* ST_CaseNil *)
-    + exists tnil'. assumption.
-    (* ST_CaseCons *)
-    + inversion HR1; subst.
-      exists (subst' y t'0 (subst' x h' tcons')).
-      repeat apply subst_R_subst'; assumption.
-Qed.
-
-Lemma step_preservation: forall conf t1 t1',
-  R conf t1 t1' ->
   forall t2, step t1 t2 ->
     exists t2', step' t1' t2' /\ R conf t2 t2'.
 Proof.
@@ -432,29 +347,7 @@ Proof.
       apply HR, Hstep.
     + assumption.
   - rename t' into x'.
-    pose proof (step_R_step' _ _ _ HR _ H).
-    pose proof (R_step _ _ _ HR _ H).
-    (* fails because nothing guarantees that H0 and H1
-       refer to the same term *)
-Abort.
-
-Lemma R_mstep: forall conf t v,
-  step_normal_form_of t v ->
-  forall t', R conf t t' ->
-  exists v', step'_normal_form_of t' v' /\
-  R conf v v'.
-Proof.
-  intros conf t v [Hms Hnf].
-  induction Hms; intros t' HR.
-  - eexists t'. split; [split|].
-    + apply multi_refl.
-    + intros Hstep.
-      apply Hnf; clear Hnf.
-      apply R_redux_iff in HR as [_ HR].
-      apply HR, Hstep.
-    + assumption.
-  - rename t' into x'.
-    pose proof (step_preservation _ _ _ HR _ H)
+    pose proof (step_R_step' _ _ _ HR _ H)
      as [y' [H' HR']].
     apply (IHHms Hnf) in HR' as [v' [[Hms' Hnf'] HR']].
     exists v'. split; [split|]; try assumption.
