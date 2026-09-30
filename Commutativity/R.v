@@ -95,26 +95,32 @@ Qed.
    so is their counterpart  *)
 
 Lemma R_step: forall conf t1 t1',
-  R conf t1 t1' -> forall t2, step t1 t2 -> exists t2', step' t1' t2'.
+  R conf t1 t1' -> (exists t2, step t1 t2) -> exists t2', step' t1' t2'.
 Proof.
   intros conf t1 t1' HR.
-  induction HR; intros t21 Hstep; inversion Hstep; subst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_App'. eassumption.
+  induction HR; intros [t21 Hstep]; inversion Hstep; subst.
+(* R_App *)
+  - pose proof (IHHR1 (ex_intro _ t1'0 H2)) as [t2'' H3]. eexists. apply ST_App'. eassumption.
   - inversion HR1; subst. eexists. apply ST_AppAbs'.
+(* R_Fixp *)
   - inversion HR; subst. eexists. apply ST_FixpAbs'.
-  - apply IHHR in H0 as []. eexists. apply ST_Fixp'. eassumption.
-  - apply IHHR in H0 as []. eexists. apply ST_Succ'. eassumption.
+  - pose proof (IHHR (ex_intro _ t2 H0)) as [t'' H3]. eexists. apply ST_Fixp'. eassumption.
+(* R_Succ *)
+  - pose proof (IHHR (ex_intro _ t2 H0)) as [t'' H3]. eexists. apply ST_Succ'. eassumption.
   - inversion HR; subst. eexists. apply ST_SuccConst'.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Add1'. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Add2'.
+(* R_Add *)
+  - pose proof (IHHR1 (ex_intro _ t1'0 H2)) as [t2'' H3]. eexists. apply ST_Add1'. eassumption.
+  - pose proof (IHHR2 (ex_intro _ t2'0 H3)) as [t2'' H4]. eexists. apply ST_Add2'.
     + rewrite value_R_value' in H1; eassumption.
     + eassumption.
   - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst'.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1'. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2'.
+(* R_Cons *)
+  - pose proof (IHHR1 (ex_intro _ t2 H2)) as [h'' H3]. eexists. apply ST_Cons1'. eassumption.
+  - pose proof (IHHR2 (ex_intro _ t3 H3)) as [t3' H4]. eexists. apply ST_Cons2'.
     + rewrite value_R_value' in H1; eassumption.
     + eassumption.
-  - apply IHHR1 in H5 as []. eexists. apply ST_Case1'. eassumption.
+(* R_Case *)
+  - pose proof (IHHR1 (ex_intro _ t2 H5)) as [t2' H3]. eexists. apply ST_Case1'. eassumption.
   - inversion HR1; subst. eexists. apply ST_CaseNil'.
   - inversion HR1; subst. eexists. apply ST_CaseCons'.
     + rewrite value_R_value' in H5; eassumption.
@@ -122,26 +128,32 @@ Proof.
 Qed.
 
 Lemma R_step': forall conf t1 t1',
-  R conf t1 t1' -> forall t2', step' t1' t2' -> exists t2, step t1 t2.
+  R conf t1 t1' -> (exists t2', step' t1' t2') -> exists t2, step t1 t2.
 Proof.
   intros conf t1 t1' HR.
-  induction HR; intros t21 Hstep; inversion Hstep; subst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_App. eassumption.
+  induction HR; intros [t21 Hstep]; inversion Hstep; subst.
+(* R_App *)
+  - pose proof (IHHR1 (ex_intro _ t1'' H2)) as [t2'' H3]. eexists. apply ST_App. eassumption.
   - inversion HR1; subst. eexists. apply ST_AppAbs.
+(* R_Fixp *)
   - inversion HR; subst. eexists. apply ST_FixpAbs.
-  - apply IHHR in H0 as []. eexists. apply ST_Fixp. eassumption.
-  - apply IHHR in H0 as []. eexists. apply ST_Succ. eassumption.
+  - pose proof (IHHR (ex_intro _ t2' H0)) as [t'' H3]. eexists. apply ST_Fixp. eassumption.
+(* R_Succ *)
+  - pose proof (IHHR (ex_intro _ t'' H0)) as [t''' H3]. eexists. apply ST_Succ. eassumption.
   - inversion HR; subst. eexists. apply ST_SuccConst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Add1. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Add2.
+(* R_Add *)
+  - pose proof (IHHR1 (ex_intro _ t1'' H2)) as [t2'' H3]. eexists. apply ST_Add1. eassumption.
+  - pose proof (IHHR2 (ex_intro _ t2'' H3)) as [t2''' H4]. eexists. apply ST_Add2.
     + rewrite <- value_R_value' in H1; eassumption.
     + eassumption.
   - inversion HR1; inversion HR2; subst. eexists. apply ST_AddConst.
-  - apply IHHR1 in H2 as []. eexists. apply ST_Cons1. eassumption.
-  - apply IHHR2 in H3 as []. eexists. apply ST_Cons2.
+(* R_Cons *)
+  - pose proof (IHHR1 (ex_intro _ t2' H2)) as [h'' H3]. eexists. apply ST_Cons1. eassumption.
+  - pose proof (IHHR2 (ex_intro _ t3' H3)) as [t3'' H4]. eexists. apply ST_Cons2.
     + rewrite <- value_R_value' in H1; eassumption.
     + eassumption.
-  - apply IHHR1 in H5 as []. eexists. apply ST_Case1. eassumption.
+(* R_Case *)
+  - pose proof (IHHR1 (ex_intro _ t2' H5)) as [t2'' H3]. eexists. apply ST_Case1. eassumption.
   - inversion HR1; subst. eexists. apply ST_CaseNil.
   - inversion HR1; subst. eexists. apply ST_CaseCons.
     + rewrite <- value_R_value' in H5; eassumption.
@@ -153,8 +165,8 @@ Corollary R_redux_iff: forall conf t1 t1',
   (exists t2, step t1 t2) <-> (exists t2', step' t1' t2').
 Proof.  
   intros. split.
-  - intros [t2 Hs]. eapply R_step; eauto.
-  - intros [t2' Hs']. eapply R_step'; eauto.
+  - eapply R_step; eauto.
+  - eapply R_step'; eauto.
 Qed.
 
 (* The next lemma states that reducing related terms
