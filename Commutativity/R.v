@@ -91,6 +91,34 @@ Proof.
     + apply IHvalue'2; assumption.
 Qed.
 
+(* This is a proof about how we can define R_step in two equivalent ways.
+   One using forall, and the other using exists. 
+   We currently use the version with exists, because it is more
+   intuitive to reason about in natural language. *)
+
+Lemma R_step_equiv: (forall conf t1 t1',
+  R conf t1 t1' -> forall t2, step t1 t2 
+                -> exists t2', step' t1' t2')
+<->
+              (forall conf t1 t1',
+  R conf t1 t1' -> (exists t2, step t1 t2) 
+                -> exists t2', step' t1' t2').
+Proof.
+  split.
+  - intros H conf t1 t1'.
+    specialize H with (conf:= conf).
+    specialize H with (t1:=t1).
+    specialize H with (t1':=t1').
+    intros H1 [t2 H2]. eapply H in H1; eauto.
+  - intros H conf t1 t1' HR t2 Hstep.
+    specialize H with (conf:=conf).
+    specialize H with (t1:=t1).
+    specialize H with (t1':=t1').
+    apply H in HR.
+    assumption.
+    exists t2. assumption.
+Qed.
+
 (* The two next lemmas state that if a related term is reducible
    so is their counterpart  *)
 
@@ -315,7 +343,7 @@ Qed.
    An analysis function that returns functions as analysis results
    is out of the scope of this theory. Although it should be 
    possible to reason about by extending the notion of derivation. *)
-
+(* TODO: Revisit this definition to make it less repetitive *)
 Inductive analysis_result: tm -> Prop :=
   | v_nat : forall n, analysis_result (const n)
   | v_lnil : analysis_result nil
